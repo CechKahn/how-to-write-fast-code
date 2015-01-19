@@ -28,12 +28,32 @@ namespace omp
     for (unsigned int i = 0; i < sq_dimension; i++) 
       {
 	for(unsigned int j = 0; j < sq_dimension; j++) 
-	  {       
+	  {  
 	    sq_matrix_result[i*sq_dimension + j] = 0;
 	    for (unsigned int k = 0; k < sq_dimension; k++)
 	      sq_matrix_result[i*sq_dimension + j] += sq_matrix_1[i*sq_dimension + k] * sq_matrix_2[k*sq_dimension + j];
 	  }
       }// End of parallel region
   }
-  
+
+	/*
+	 * @Desc: This function will do muplication on two matrix, according to its parameters. 
+	 * 			Generally each thread should be executing this function parallelly to get the final result.
+	 * @Para m1,m2: The first matrix to be multiplied, it might be the pointer diverging from the 
+	 * 				original sq_matrix_1 or sq_matrix_2. E.g , m1 = sq_matrix_1 + sq_dimension and m2 = sq_matrix_2 + sq_dimension 
+	 * @Para result: Where the result should be stored, the actual return value
+	 * @Para block_size: The size of the sub block where the actual multiplcaition is performed
+	 * @Para sq_dimension: The dimension of the square matrix
+	 *
+	 */
+	void matrix_multiplication_subblock(float *m1, float *m2, float *result,unsigned int &block_size,unsigned int &sq_dimension)
+	{
+	//result[row][col] would be the corresponding element in the resulting matrix
+		unsigned int row, col, count;
+		for(row = 0;row < block_size;row++)
+			for(col = 0;col < block_size;col++)
+				for(count = 0;count < block_size;count++)
+				result[row * sq_dimension + col] += m1[row * sq_dimension + count] * m2[count * sq_dimension + col];
+		return ;
+	} 
 } //namespace omp
