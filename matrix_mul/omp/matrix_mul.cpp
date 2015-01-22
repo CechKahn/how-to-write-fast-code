@@ -19,25 +19,65 @@
 #include <omp.h>
 #include "matrix_mul.h"
 #include <stdio.h>
+#include <string.h>
 
+#define NB 128
+#define NUM_OF_THREADS 4
 
-#define NB 128 
 namespace omp
 {
-  void
-  matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_matrix_result, unsigned int sq_dimension )
-  {
+
+void matrix_multiplication_subblock(float *m1, float *m2, float *result,unsigned int &block_size,unsigned int &sq_dimension);
+
+void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_matrix_result, unsigned int sq_dimension ){
+	omp_set_num_threads(NUM_OF_THREADS);
+	memset(sq_matrix_result,0,sizeof(float) * sq_dimension * sq_dimension);
+	bool enable_block_mul = false;
+	if(sq_dimension >= 64)
+		enable_block_mul = true;
+	else
+		enable_block_mul = false;
+	if(enable_block_mul)
+	{
+		unsigned blk_range = 128;
+		unsigned current_row = 0;
+		unsigned current_col = 0;
+		while(sq_dimension % blk_range != 0)
+			blk_range--;
+		printf("\nblk_range set to be %u\n",blk_range);
+#pragma omp parallel for
+		for(unsigned i = 0;i < sq_dimension;i+=blk_range)
+		{
+			printf("Thread %d computing by [%u %u]\n",omp_get_thread_num(),i,i+blk_range);
+			for(unsigned j = 0;j < sq_dimension;j+=blk_range)
+			{
+				for(unsigned k = 0;k < sq_dimension;k+=blk_range)
+				{
+					//printf("computing i=%u,j=%u, k=%u\n",i,j,k);
+					matrix_multiplication_subblock(&sq_matrix_1[i * sq_dimension + k]\ 
+													,&sq_matrix_2[k * sq_dimension + j]\
+													,&sq_matrix_result[i * sq_dimension + j]\
+													,blk_range,sq_dimension);	
+				}
+				current_col = j;
+			}
+			current_row = i;
+		}
+	}
+	else
+	{
 #pragma omp parallel for
 	for (unsigned int i = 0; i < sq_dimension; i++)
 	{
 		for(unsigned int j = 0; j < sq_dimension; j++) 
 		{
-			sq_matrix_result[i*sq_dimension + j] = 0;
+			//sq_matrix_result[i*sq_dimension + j] = 0;
 			for (unsigned int k = 0; k < sq_dimension; k++)
 				sq_matrix_result[i*sq_dimension + j] += sq_matrix_1[i*sq_dimension + k] * sq_matrix_2[k*sq_dimension + j];
 		}
 	}// End of parallel region
-  }
+	}
+}
 
 	/*
 	 * @Desc: This function will do muplication on two matrix, according to its parameters. 
@@ -58,5 +98,6 @@ namespace omp
 				for(count = 0;count < block_size;count++)
 				result[row * sq_dimension + col] += m1[row * sq_dimension + count] * m2[count * sq_dimension + col];
 		return ;
-	} 
+	}
+
 } //namespace omp
