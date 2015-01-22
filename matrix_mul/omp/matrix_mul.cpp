@@ -33,7 +33,7 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 	omp_set_num_threads(NUM_OF_THREADS);
 	memset(sq_matrix_result,0,sizeof(float) * sq_dimension * sq_dimension);
 	bool enable_block_mul = false;
-	if(sq_dimension >= 64)
+	if(sq_dimension >= 256)
 		enable_block_mul = true;
 	else
 		enable_block_mul = false;
@@ -44,13 +44,15 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 		unsigned current_col = 0;
 		while(sq_dimension % blk_range != 0)
 			blk_range--;
-		//printf("\nblk_range set to be %u\n",blk_range);
+		printf("\nblk_range set to be %u\n",blk_range);
 #pragma omp parallel for
 		for(unsigned i = 0;i < sq_dimension;i+=blk_range)
 		{
-			//printf("Thread %d computing by [%u %u]\n",omp_get_thread_num(),i,i+blk_range);
+			//printf("Thread %d computing i by [%u %u]\n",omp_get_thread_num(),i,i+blk_range);
+			# pragma omp parallel for 
 			for(unsigned j = 0;j < sq_dimension;j+=blk_range)
 			{
+				//printf("Thread %d computing i by [%u %u] computing j by [%u %u]\n",omp_get_thread_num(),i,i+blk_range,j,j+blk_range);
 				for(unsigned k = 0;k < sq_dimension;k+=blk_range)
 				{
 					//printf("computing i=%u,j=%u, k=%u\n",i,j,k);
