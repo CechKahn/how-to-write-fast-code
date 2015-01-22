@@ -18,22 +18,25 @@
 
 #include <omp.h>
 #include "matrix_mul.h"
+#include <stdio.h>
 
+
+#define NB 128 
 namespace omp
 {
   void
   matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_matrix_result, unsigned int sq_dimension )
   {
 #pragma omp parallel for
-    for (unsigned int i = 0; i < sq_dimension; i++) 
-      {
-	for(unsigned int j = 0; j < sq_dimension; j++) 
-	  {  
-	    sq_matrix_result[i*sq_dimension + j] = 0;
-	    for (unsigned int k = 0; k < sq_dimension; k++)
-	      sq_matrix_result[i*sq_dimension + j] += sq_matrix_1[i*sq_dimension + k] * sq_matrix_2[k*sq_dimension + j];
-	  }
-      }// End of parallel region
+	for (unsigned int i = 0; i < sq_dimension; i++)
+	{
+		for(unsigned int j = 0; j < sq_dimension; j++) 
+		{
+			sq_matrix_result[i*sq_dimension + j] = 0;
+			for (unsigned int k = 0; k < sq_dimension; k++)
+				sq_matrix_result[i*sq_dimension + j] += sq_matrix_1[i*sq_dimension + k] * sq_matrix_2[k*sq_dimension + j];
+		}
+	}// End of parallel region
   }
 
 	/*
