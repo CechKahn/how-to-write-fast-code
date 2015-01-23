@@ -30,7 +30,7 @@ namespace omp
       float *sq_matrix_2,
       float *sq_matrix_result,
       unsigned int sq_dimension ) {
-    uint block_size = 64;
+    uint block_size = 32;
     for (uint kk = 0; kk < sq_dimension; kk+=block_size) {
       for (uint jj = 0; jj < sq_dimension; jj+=block_size) {
         for (uint i = 0; i < sq_dimension; i++) {
