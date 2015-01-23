@@ -49,5 +49,4 @@ namespace omp
       }
     }
   }
-  
 } //namespace omp
