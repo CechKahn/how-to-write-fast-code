@@ -46,12 +46,14 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 		while(sq_dimension % blk_range != 0)
 			blk_range--;
 		printf("\nblk_range set to be %u\n",blk_range);
+		/*
 		float *a;
 		posix_memalign((void**)(&a),16,sizeof(float) * sq_dimension * sq_dimension);
 		float *b;
 		posix_memalign((void**)(&b),16,sizeof(float) * sq_dimension * sq_dimension);
 		memcpy(a,sq_matrix_1,sizeof(float) * sq_dimension * sq_dimension);
 		memcpy(b,sq_matrix_2,sizeof(float) * sq_dimension * sq_dimension);
+		*/
 #pragma omp parallel for
 		for(unsigned j = 0;j < sq_dimension;j+=blk_range)
 		{
@@ -64,8 +66,8 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 				for(unsigned k = 0;k < sq_dimension;k+=blk_range)
 				{
 					//printf("computing i=%u,j=%u, k=%u\n",i,j,k);
-					matrix_multiplication_subblock(&a[i * sq_dimension + k]\ 
-													,&b[k * sq_dimension + j]\
+					matrix_multiplication_subblock(&sq_matrix_1[i * sq_dimension + k]\ 
+													,&sq_matrix_2[k * sq_dimension + j]\
 													,&sq_matrix_result[i * sq_dimension + j]\
 													,blk_range,sq_dimension);
 				}
