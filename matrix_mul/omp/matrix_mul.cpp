@@ -34,7 +34,7 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 	memset(sq_matrix_result,0,sizeof(float) * sq_dimension * sq_dimension);
 	bool enable_block_mul = false;
 	if(sq_dimension >= 256)
-		enable_block_mul = true;
+		enable_block_mul = false;
 	else
 		enable_block_mul = false;
 	if(enable_block_mul)
