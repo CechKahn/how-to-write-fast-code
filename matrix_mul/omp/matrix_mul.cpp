@@ -28,7 +28,7 @@
 namespace omp
 {
 
-void matrix_multiplication_subblock(float *m1, float *m2, float *result,unsigned int &block_size,unsigned int &sq_dimension);
+inline void matrix_multiplication_subblock(float *m1, float *m2, float *result,unsigned int &block_size,unsigned int &sq_dimension);
 
 void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_matrix_result, unsigned int sq_dimension ){
 	omp_set_num_threads(NUM_OF_THREADS);
@@ -54,11 +54,10 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 		memcpy(a,sq_matrix_1,sizeof(float) * sq_dimension * sq_dimension);
 		memcpy(b,sq_matrix_2,sizeof(float) * sq_dimension * sq_dimension);
 		*/
-#pragma omp parallel for
+#pragma omp parallel for shared(sq_matrix_1,sq_matrix_2,sq_matrix_result)
 		for(unsigned j = 0;j < sq_dimension;j+=blk_range)
 		{
 			//printf("Thread %d computing i by [%u %u]\n",omp_get_thread_num(),i,i+blk_range);
-			# pragma omp parallel for 
 			for(unsigned i = 0;i < sq_dimension;i+=blk_range)
 			{
 				//printf("Thread %d computing i by [%u %u] computing j by [%u %u]\n",omp_get_thread_num(),i,i+blk_range,j,j+blk_range);
@@ -101,7 +100,7 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 	 * @Para sq_dimension: The dimension of the square matrix
 	 *
 	 */
-	void matrix_multiplication_subblock(float *m1, float *m2, float *result,unsigned int &block_size,unsigned int &sq_dimension)
+inline	void matrix_multiplication_subblock(float *m1, float *m2, float *result,unsigned int &block_size,unsigned int &sq_dimension)
 	{
 	//result[row][col] would be the corresponding element in the resulting matrix
 		unsigned int row, col, count;
