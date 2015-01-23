@@ -18,6 +18,8 @@
 
 #include <algorithm>
 #include <omp.h>
+#include <stdlib.h>
+#include <memory.h>
 #include "matrix_mul.h"
 
 typedef unsigned int uint;
@@ -30,7 +32,8 @@ namespace omp
       float *sq_matrix_2,
       float *sq_matrix_result,
       unsigned int sq_dimension ) {
-    uint block_size = 32;
+    memset(sq_matrix_result, 0, sq_dimension*sq_dimension*sizeof(float));
+    uint block_size = 64;
     for (uint kk = 0; kk < sq_dimension; kk+=block_size) {
       for (uint jj = 0; jj < sq_dimension; jj+=block_size) {
         for (uint i = 0; i < sq_dimension; i++) {
