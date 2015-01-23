@@ -40,17 +40,17 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 	if(enable_block_mul)
 	{
 		unsigned blk_range = 128;
-		unsigned current_row = 0;
-		unsigned current_col = 0;
+		//unsigned current_row = 0;
+		//unsigned current_col = 0;
 		while(sq_dimension % blk_range != 0)
 			blk_range--;
-		printf("\nblk_range set to be %u\n",blk_range);
+		//printf("\nblk_range set to be %u\n",blk_range);
 #pragma omp parallel for
-		for(unsigned i = 0;i < sq_dimension;i+=blk_range)
+		for(unsigned j = 0;j < sq_dimension;j+=blk_range)
 		{
 			//printf("Thread %d computing i by [%u %u]\n",omp_get_thread_num(),i,i+blk_range);
 			# pragma omp parallel for 
-			for(unsigned j = 0;j < sq_dimension;j+=blk_range)
+			for(unsigned i = 0;i < sq_dimension;i+=blk_range)
 			{
 				//printf("Thread %d computing i by [%u %u] computing j by [%u %u]\n",omp_get_thread_num(),i,i+blk_range,j,j+blk_range);
 				for(unsigned k = 0;k < sq_dimension;k+=blk_range)
@@ -59,11 +59,11 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 					matrix_multiplication_subblock(&sq_matrix_1[i * sq_dimension + k]\ 
 													,&sq_matrix_2[k * sq_dimension + j]\
 													,&sq_matrix_result[i * sq_dimension + j]\
-													,blk_range,sq_dimension);	
+													,blk_range,sq_dimension);
 				}
-				current_col = j;
+				//current_col = j;
 			}
-			current_row = i;
+			//current_row = i;
 		}
 	}
 	else
