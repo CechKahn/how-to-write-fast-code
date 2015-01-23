@@ -45,7 +45,7 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 		//unsigned current_col = 0;
 		while(sq_dimension % blk_range != 0)
 			blk_range--;
-		printf("\nblk_range set to be %u\n",blk_range);
+		//printf("\nblk_range set to be %u\n",blk_range);
 		/*
 		float *a;
 		posix_memalign((void**)(&a),16,sizeof(float) * sq_dimension * sq_dimension);
