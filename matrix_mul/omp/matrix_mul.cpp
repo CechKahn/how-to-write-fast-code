@@ -19,21 +19,29 @@
 #include <omp.h>
 #include "matrix_mul.h"
 
+typedef uint unsigned int;
+
 namespace omp
 {
   void
-  matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_matrix_result, unsigned int sq_dimension )
-  {
-#pragma omp parallel for
-    for (unsigned int i = 0; i < sq_dimension; i++) 
-      {
-	for(unsigned int j = 0; j < sq_dimension; j++) 
-	  {       
-	    sq_matrix_result[i*sq_dimension + j] = 0;
-	    for (unsigned int k = 0; k < sq_dimension; k++)
-	      sq_matrix_result[i*sq_dimension + j] += sq_matrix_1[i*sq_dimension + k] * sq_matrix_2[k*sq_dimension + j];
-	  }
-      }// End of parallel region
+  matrix_multiplication(
+      float *sq_matrix_1,
+      float *sq_matrix_2,
+      float *sq_matrix_result,
+      unsigned int sq_dimension ) {
+    uint block_size = 64;
+    for (uint kk = 0; kk < sq_dimension; kk+=block_size) {
+      for (uint jj = 0; jj < sq_dimension; jj+=block_size) {
+        for (uint i = 0; i < sq_dimension; i++) {
+          for (uint k = kk; k < std::min(sq_dimension, kk+block_size); k++) {
+            float r = sq_matrix_1[i][k];
+            for (uint j = jj; j < std::min(sq_dimension, jj+block_size); j++) {
+              sq_matrix_result[i][j] += r * sq_matrix_2[k][j];
+            }
+          }
+        }
+      }
+    }
   }
   
 } //namespace omp
