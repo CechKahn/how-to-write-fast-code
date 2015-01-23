@@ -14,7 +14,7 @@ $(PROJ): $(OBJS)
 	$(CC) $(OMPFLAGS) $(LDFLAGS) $^ -o $@ $(LIBS)
 
 %.o : %.cpp
-	$(CC) $(OMPFLAGS) $(CFLAGS) $< -o $@ $(SIMDFLAGS)
+	$(CC) $(CFLAGS) $< -o $@ $(SIMDFLAGS)
 
 %.o : %.cpp %.h
 	$(CC) $(CFLAGS) $< -o $@ $(SIMDFLAGS)
