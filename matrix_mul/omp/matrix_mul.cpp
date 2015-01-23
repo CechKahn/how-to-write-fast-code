@@ -16,10 +16,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <algorithm>
 #include <omp.h>
 #include "matrix_mul.h"
 
-typedef uint unsigned int;
+typedef unsigned int uint;
 
 namespace omp
 {
@@ -33,10 +34,12 @@ namespace omp
     for (uint kk = 0; kk < sq_dimension; kk+=block_size) {
       for (uint jj = 0; jj < sq_dimension; jj+=block_size) {
         for (uint i = 0; i < sq_dimension; i++) {
+          uint base_i = i*sq_dimension;
           for (uint k = kk; k < std::min(sq_dimension, kk+block_size); k++) {
-            float r = sq_matrix_1[i][k];
+            float r = sq_matrix_1[base_i+k];
+            uint base_k = k *sq_dimension;
             for (uint j = jj; j < std::min(sq_dimension, jj+block_size); j++) {
-              sq_matrix_result[i][j] += r * sq_matrix_2[k][j];
+              sq_matrix_result[base_i+j] += r * sq_matrix_2[base_k+j];
             }
           }
         }
