@@ -20,6 +20,7 @@
 #include "matrix_mul.h"
 #include <stdio.h>
 #include <string.h>
+#include <xmmintrin.h>
 
 #define NB 128
 #define NUM_OF_THREADS 4
@@ -44,7 +45,13 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 		//unsigned current_col = 0;
 		while(sq_dimension % blk_range != 0)
 			blk_range--;
-		//printf("\nblk_range set to be %u\n",blk_range);
+		printf("\nblk_range set to be %u\n",blk_range);
+		float *a;
+		posix_memalign((void**)(&a),16,sizeof(float) * sq_dimension * sq_dimension);
+		float *b;
+		posix_memalign((void**)(&b),16,sizeof(float) * sq_dimension * sq_dimension);
+		memcpy(a,sq_matrix_1,sizeof(float) * sq_dimension * sq_dimension);
+		memcpy(b,sq_matrix_2,sizeof(float) * sq_dimension * sq_dimension);
 #pragma omp parallel for
 		for(unsigned j = 0;j < sq_dimension;j+=blk_range)
 		{
@@ -53,11 +60,12 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 			for(unsigned i = 0;i < sq_dimension;i+=blk_range)
 			{
 				//printf("Thread %d computing i by [%u %u] computing j by [%u %u]\n",omp_get_thread_num(),i,i+blk_range,j,j+blk_range);
+
 				for(unsigned k = 0;k < sq_dimension;k+=blk_range)
 				{
 					//printf("computing i=%u,j=%u, k=%u\n",i,j,k);
-					matrix_multiplication_subblock(&sq_matrix_1[i * sq_dimension + k]\ 
-													,&sq_matrix_2[k * sq_dimension + j]\
+					matrix_multiplication_subblock(&a[i * sq_dimension + k]\ 
+													,&b[k * sq_dimension + j]\
 													,&sq_matrix_result[i * sq_dimension + j]\
 													,blk_range,sq_dimension);
 				}
@@ -95,10 +103,69 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 	{
 	//result[row][col] would be the corresponding element in the resulting matrix
 		unsigned int row, col, count;
-		for(row = 0;row < block_size;row++)
 			for(col = 0;col < block_size;col++)
-				for(count = 0;count < block_size;count++)
-				result[row * sq_dimension + col] += m1[row * sq_dimension + count] * m2[count * sq_dimension + col];
+				for(row = 0;row < block_size;row++)
+					for(count = 0;count < block_size;)
+					{
+						/*	
+						if(count + 4 < block_size)
+						{
+							__m128* mA;
+							__m128* mB;
+							__m128 mC;
+							
+						 	float __attribute__((aligned(16)))b[4] = {m2[count * sq_dimension + col],
+																		m2[(count + 1) * sq_dimension + col],
+																		m2[(count + 2) * sq_dimension + col],
+																		m2[(count + 3) * sq_dimension + col]};
+							
+							float __attribute__((aligned(16)))a[4] = {m1[row * sq_dimension + count],
+																		m1[row * sq_dimension + count + 1],
+																		m1[row * sq_dimension + count + 2],
+																		m1[row * sq_dimension + count + 3]};
+							
+		
+							a[0] = m1[row * sq_dimension + count];
+							a[1] = m1[row * sq_dimension + count + 1];
+							a[2] = m1[row * sq_dimension + count + 2];
+							a[3] = m1[row * sq_dimension + count + 3];
+							
+							b[0] = m2[count * sq_dimension + col];
+							b[1] = m2[(count + 1) * sq_dimension + col];
+							b[2] = m2[(count + 2) * sq_dimension + col];
+							b[3] = m2[(count + 3) * sq_dimension + col];
+							mA = (__m128*) (&m1[row * sq_dimension + count]);
+							mB = (__m128*) (b);
+							mC = _mm_mul_ps(*mA,*mB);
+							union
+							{
+								__m128 m;
+								float f[4];
+							} x;
+							x.m = mC;
+							//printf("%f %f %f %f\n",x.f[0],x.f[1],x.f[2],x.f[3]);
+							result[row * sq_dimension + col] +=(x.f[0] + x.f[1] + x.f[2] + x.f[3]); 
+							count+=4;
+						}
+						else
+						{
+							result[row * sq_dimension + col] += m1[row * sq_dimension + count] * m2[count * sq_dimension + col];
+							count++;
+						}
+						*/
+						if(count + 4 < block_size)
+						{
+							result[row * sq_dimension + col] += (m1[row * sq_dimension + count] * m2[count * sq_dimension + col]\
+																+m1[row * sq_dimension + count + 1] * m2[(count + 1) * sq_dimension + col]\
+																+m1[row * sq_dimension + count + 2] * m2[(count + 2) * sq_dimension + col]\
+																+m1[row * sq_dimension + count + 3] * m2[(count + 3) * sq_dimension + col]);
+							count+=4;
+						}
+						else{
+						result[row * sq_dimension + col] += m1[row * sq_dimension + count] * m2[count * sq_dimension + col];
+						count++;
+						}
+					}
 		return ;
 	}
 
