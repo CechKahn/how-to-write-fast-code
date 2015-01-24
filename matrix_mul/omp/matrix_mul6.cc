@@ -40,14 +40,23 @@ namespace omp
     // seems we can't modify sq_matrix_1 and sq_matrix_2....
 
     uint mm_size = sq_dimension*sq_dimension*sizeof(float);
-    memset(sq_matrix_result, 0, mm_size);
-#pragma omp parallel for
+    float * tmp = (float *) malloc (mm_size);
+
     for (uint i = 0; i < sq_dimension; i++) {
-      for (uint k = 0; k < sq_dimension; k++) {
-        for (uint j = 0; j < sq_dimension; j++) {
-          sq_matrix_result[i*sq_dimension+j]+= sq_matrix_1[i*sq_dimension+k] * sq_matrix_2[k*sq_dimension+j];
-        }
+      for (uint j = 0; j < sq_dimension; j++) {
+        tmp[j*sq_dimension+i] = sq_matrix_2[i*sq_dimension+j];
       }
     }
+#pragma omp parallel for
+    for (uint i = 0; i < sq_dimension; i++) {
+      for (uint j = 0; j < sq_dimension; j++) {
+        float sum = 0.0f;
+        for (uint k = 0; k < sq_dimension; k++) {
+          sum += sq_matrix_1[i*sq_dimension+k] * tmp[j*sq_dimension+k];
+        }
+        sq_matrix_result[i*sq_dimension+j] = sum;
+      }
+    }
+    free(tmp);
   }
 } //namespace omp
