@@ -1,7 +1,7 @@
 PROJ = matrix_mul
 CC = g++
 
-CFLAGS = -c -g -Wall -I/opt/local/include -I$(HOME)/cppunit/include
+CFLAGS = -c -Wall -I/opt/local/include -I$(HOME)/cppunit/include
 LDFLAGS = -L/opt/local/lib -L$(HOME)/cppunit/lib
 LIBS = -lcppunit -ldl
 OBJS = $(patsubst %.cpp,%.o,$(wildcard *.cpp))
@@ -14,10 +14,10 @@ $(PROJ): $(OBJS)
 	$(CC) $(OMPFLAGS) $(LDFLAGS) $^ -o $@ $(LIBS)
 
 %.o : %.cpp
-	$(CC) $(CFLAGS) $< -o $@ $(SIMDFLAGS)
+	$(CC) $(OMPFLAGS) $(CFLAGS) $< -o $@ $(SIMDFLAGS)
 
 %.o : %.cpp %.h
-	$(CC) $(CFLAGS) $< -o $@ $(SIMDFLAGS)
+	$(CC) $(OMPFLAGS) $(CFLAGS) $< -o $@ $(SIMDFLAGS)
 
 clean:
 	rm -f $(PROJ) $(OBJS) *.xml

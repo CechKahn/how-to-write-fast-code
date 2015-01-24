@@ -16,11 +16,16 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <iostream>
 #include <algorithm>
 #include <omp.h>
 #include <stdlib.h>
 #include <memory.h>
+#include <cassert>
 #include "matrix_mul.h"
+
+using std::cout;
+using std::endl;
 
 typedef unsigned int uint;
 
@@ -32,21 +37,26 @@ namespace omp
       float *sq_matrix_2,
       float *sq_matrix_result,
       unsigned int sq_dimension ) {
-    memset(sq_matrix_result, 0, sq_dimension*sq_dimension*sizeof(float));
-    uint block_size = 64;
-    for (uint kk = 0; kk < sq_dimension; kk+=block_size) {
-      for (uint jj = 0; jj < sq_dimension; jj+=block_size) {
-        for (uint i = 0; i < sq_dimension; i++) {
-          uint base_i = i*sq_dimension;
-          for (uint k = kk; k < std::min(sq_dimension, kk+block_size); k++) {
-            float r = sq_matrix_1[base_i+k];
-            uint base_k = k *sq_dimension;
-            for (uint j = jj; j < std::min(sq_dimension, jj+block_size); j++) {
-              sq_matrix_result[base_i+j] += r * sq_matrix_2[base_k+j];
-            }
-          }
-        }
+    // seems we can't modify sq_matrix_1 and sq_matrix_2....
+
+    uint mm_size = sq_dimension*sq_dimension*sizeof(float);
+    float * tmp = (float *) malloc (mm_size);
+
+    for (uint i = 0; i < sq_dimension; i++) {
+      for (uint j = 0; j < sq_dimension; j++) {
+        tmp[j*sq_dimension+i] = sq_matrix_2[i*sq_dimension+j];
       }
     }
+#pragma omp parallel for
+    for (uint i = 0; i < sq_dimension; i++) {
+      for (uint j = 0; j < sq_dimension; j++) {
+        float sum = 0.0f;
+        for (uint k = 0; k < sq_dimension; k++) {
+          sum += sq_matrix_1[i*sq_dimension+k] * tmp[j*sq_dimension+k];
+        }
+        sq_matrix_result[i*sq_dimension+j] = sum;
+      }
+    }
+    free(tmp);
   }
 } //namespace omp
