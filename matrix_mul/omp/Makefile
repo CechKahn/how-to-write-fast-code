@@ -17,7 +17,7 @@ $(PROJ): $(OBJS)
 	$(CC) $(OMPFLAGS) $(CFLAGS) $< -o $@ $(SIMDFLAGS)
 
 %.o : %.cpp %.h
-	$(CC) $(CFLAGS) $< -o $@ $(SIMDFLAGS)
+	$(CC) $(OMPFLAGS) $(CFLAGS) $< -o $@ $(SIMDFLAGS)
 
 clean:
 	rm -f $(PROJ) $(OBJS) *.xml
