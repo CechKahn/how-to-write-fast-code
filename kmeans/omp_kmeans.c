@@ -24,6 +24,10 @@
 #include "kmeans.h"
 
 
+
+#define SQR(a) (a * a)
+#define EUCLID_DIST_OPTIMIZED
+
 /*----< euclid_dist_2() >----------------------------------------------------*/
 /* square of Euclid distance between two multi-dimensional points            */
 __inline static
@@ -31,10 +35,16 @@ float euclid_dist_2(int    numdims,  /* no. dimensions */
                     float *coord1,   /* [numdims] */
                     float *coord2)   /* [numdims] */
 {
-    int i;
+    int i = 0;
     float ans=0.0;
-
-    for (i=0; i<numdims; i++)
+#ifdef EUCLID_DIST_OPTIMIZED
+		for(i = 0;(i + 4) < numdims;i+=4)
+			ans += SQR(coord1[i] - coord2[i]) + \
+						SQR(coord1[i+1] - coord2[i+1]) + \
+						SQR(coord1[i+2] - coord2[i+2]) + \
+						SQR(coord1[i+3] - coord2[i+3]);
+#endif
+    for(; i<numdims; i++)
         ans += (coord1[i]-coord2[i]) * (coord1[i]-coord2[i]);
 
     return(ans);
