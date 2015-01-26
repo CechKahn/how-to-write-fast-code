@@ -1,3 +1,4 @@
+seq_main
 omp_main
 gmon.out
 kmeans*.dat*
