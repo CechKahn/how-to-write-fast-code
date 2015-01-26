@@ -26,7 +26,8 @@
 
 
 #define SQR(a) (a * a)
-#define EUCLID_DIST_OPTIMIZED
+
+//#define EUCLID_DIST_OPTIMIZED
 
 /*----< euclid_dist_2() >----------------------------------------------------*/
 /* square of Euclid distance between two multi-dimensional points            */
