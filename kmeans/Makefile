@@ -47,7 +47,7 @@ CFLAGS      = $(OPTFLAGS) $(DFLAGS) $(INCFLAGS)
 NVCCFLAGS   = $(CFLAGS) --ptxas-options=-v -arch=sm_20
 LDFLAGS     = $(OPTFLAGS)
 LIBS        =
-
+SSEFLAGS    = -msse3
 # please check the compile to the one you use and the openmp flag
 # Here, I am using gcc and its openmp compile flag is -fopenmp
 # If icc is used, please us -opnemp
@@ -70,11 +70,11 @@ OMP_SRC     = omp_main.c \
 OMP_OBJ     = $(OMP_SRC:%.c=%.o)
 
 omp_kmeans.o: omp_kmeans.c $(H_FILES)
-	$(CC) $(CFLAGS) $(OMPFLAGS) -c omp_kmeans.c
+	$(CC) $(CFLAGS) $(OMPFLAGS) $(SSEFLAGS) -c omp_kmeans.c
 
 omp: omp_main
 omp_main: $(OMP_OBJ) file_io.o
-	$(CC) $(LDFLAGS) $(OMPFLAGS) -o omp_main $(OMP_OBJ) file_io.o $(LIBS)
+	$(CC) $(LDFLAGS) $(OMPFLAGS) $(SSEFLAGS) -o omp_main $(OMP_OBJ) file_io.o $(LIBS)
 
 #------   sequential version -----------------------------------------
 SEQ_SRC     = seq_main.c   \
