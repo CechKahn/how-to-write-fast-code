@@ -39,7 +39,8 @@ float euclid_dist_2(int    numdims,  /* no. dimensions */
     int i = 0;
     float ans=0.0;
 #ifdef EUCLID_DIST_OPTIMIZED
-		for(i = 0;(i + 4) < numdims;i+=4)
+	if(numdims > 16)
+		for(i = 0;(i + 3) < numdims;i+=4)
 			ans += SQR(coord1[i] - coord2[i]) + \
 						SQR(coord1[i+1] - coord2[i+1]) + \
 						SQR(coord1[i+2] - coord2[i+2]) + \
