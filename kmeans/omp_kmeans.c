@@ -22,13 +22,19 @@
 
 #include <omp.h>
 #include "kmeans.h"
-
+#include <pmmintrin.h>
 
 
 #define SQR(a) ((a) * (a))
 
-#define EUCLID_DIST_OPTIMIZED
-
+//#define EUCLID_DIST_OPTIMIZED
+#define SSE_EUCLID_OPTIMIZED
+//#define NO_OPTIMIZED
+typedef union
+{
+	__m128 m;
+	float f[4];
+} ext;
 /*----< euclid_dist_2() >----------------------------------------------------*/
 /* square of Euclid distance between two multi-dimensional points            */
 __inline static
@@ -45,10 +51,34 @@ float euclid_dist_2(int    numdims,  /* no. dimensions */
 						SQR(coord1[i+1] - coord2[i+1]) + \
 						SQR(coord1[i+2] - coord2[i+2]) + \
 						SQR(coord1[i+3] - coord2[i+3]);
-#endif
     for(; i<numdims; i++)
         ans += (coord1[i]-coord2[i]) * (coord1[i]-coord2[i]);
+#endif
 
+#ifdef SSE_EUCLID_OPTIMIZED
+	if(numdims >= 4)
+	{
+		ext x;
+		__m128 tmp;
+		for(i = 0;(i + 3) < numdims;i+=4)
+		{
+			tmp = _mm_set_ps(coord1[i] - coord2[i],\
+															coord1[i+1] - coord2[i+1],\
+															coord1[i+2] - coord2[i+2],\
+															coord1[i+3] - coord2[i+3]);
+			tmp = _mm_mul_ps(tmp,tmp);
+			x.m = tmp;
+			ans += (x.f[0] + x.f[1] + x.f[2]+ x.f[3]);
+		}
+	}
+	for(;i<numdims;i++)
+		ans += SQR(coord1[i]-coord2[i]);
+#endif
+
+#ifdef NO_OPTIMIZED
+	for(;i<numdims;i++)
+		ans += SQR(coord1[i] - coord2[i]);
+#endif
     return(ans);
 }
 
