@@ -106,7 +106,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
     assert(newObjects != NULL);
     memcpy(newObjects[0], objects[0], numCoords * sizeof(float));
     for (i = 1; i < numObjs; i++) {
-      newObjects[i] = newObjects[i-1] + numObjs;
+      newObjects[i] = newObjects[i-1] + numCoords;
       memcpy(newObjects[i], objects[i], numCoords * sizeof(float));
     }
 
