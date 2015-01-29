@@ -157,6 +157,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
                 shared(objects,clusters,membership,local_newClusters,local_newClusterSize)
         {
             int tid = omp_get_thread_num();
+
             #pragma omp for \
                         private(i,j,index) \
                         firstprivate(numObjs,numClusters,numCoords) \
