@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include <omp.h>
 #include "kmeans.h"
@@ -81,7 +82,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
     int     *newClusterSize; /* [numClusters]: no. objects assigned in each
                                 new cluster */
     int     delta;          /* % of objects change their clusters */
-    int     threshold_int = std::floor(threshold * numObjs);
+    int     threshold_int = (int)floor(threshold * numObjs);
     float  **clusters;       /* out: [numClusters][numCoords] */
     float  **newClusters;    /* [numClusters][numCoords] */
     double   timing;

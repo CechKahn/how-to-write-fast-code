@@ -51,7 +51,7 @@ LIBS        =
 # Here, I am using gcc and its openmp compile flag is -fopenmp
 # If icc is used, please us -opnemp
 #
-OMPFLAGS    = -fopenmp
+OMPFLAGS    = -fopenmp -lm
 
 CC          = gcc
 MPICC       = mpicc
