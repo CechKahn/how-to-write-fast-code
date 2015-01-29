@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h> // memcpy
 
 #include <omp.h>
 #include "kmeans.h"
@@ -93,11 +94,11 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
   int      nthreads;             /* no. threads */
   int    **local_newClusterSize; /* [nthreads][numClusters] */
   float ***local_newClusters;    /* [nthreads][numClusters][numCoords] */
-  bool isMultOf4 = true;
+  int isMultOf4 = 1;
 
   int mask4 = 0x3;
   if ((numCoords & mask4) > 0) {
-    isMultOf4 = false;
+    isMultOf4 = 0;
     int newNumCoords = numCoords + 4 - (numCoords & mask4);
     float **newObjects = (float **)malloc(numObjs * sizeof(float*));
     assert(newObjects != NULL);
