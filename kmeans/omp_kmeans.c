@@ -169,7 +169,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
               for (j = 1; j < numClusters; j++) {
                 float dist = 0;
                 float *coord2 = clusters[j];
-                for (k = 0; k < numDims; k++) {
+                for (k = 0; k < numCoords; k++) {
                   dist += (coord1[k] - coord2[k]) * (coord1[k] - coord2[k]);
                 }
                 if (dist < min_dist) {
