@@ -122,8 +122,9 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
     int      i, j, k, index, loop=0;
     int     *newClusterSize; /* [numClusters]: no. objects assigned in each
                                 new cluster */
-    int    delta;          /* % of objects change their clusters */
-    float  **clusters;       /* out: [numClusters][numCoords] */
+    float    delta;          /* % of objects change their clusters */
+    unsigned int_delta;
+		float  **clusters;       /* out: [numClusters][numCoords] */
     float  **newClusters;    /* [numClusters][numCoords] */
     double   timing;
 
@@ -192,7 +193,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
 
     if (_debug) timing = omp_get_wtime();
     do {
-        delta = 0;
+        int_delta = 0;
 
         if (is_perform_atomic) {
             #pragma omp parallel for \
@@ -200,14 +201,14 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
                     firstprivate(numObjs,numClusters,numCoords) \
                     shared(objects,clusters,membership,newClusters,newClusterSize) \
                     schedule(static) \
-                    reduction(+:delta)
+                    reduction(+:int_delta)
             for (i=0; i<numObjs; i++) {
                 /* find the array index of nestest cluster center */
                 index = find_nearest_cluster(numClusters, numCoords, objects[i],
                                              clusters);
 
                 /* if membership changes, increase delta by 1 */
-                if (membership[i] != index) delta += 1;
+                if (membership[i] != index) int_delta += 1;
 
                 /* assign the membership to object i */
                 membership[i] = index;
@@ -229,14 +230,14 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
                             private(i,j,index) \
                             firstprivate(numObjs,numClusters,numCoords) \
                             schedule(static) \
-                            reduction(+:delta)
+                            reduction(+:int_delta)
                 for (i=0; i<numObjs; i++) {
                     /* find the array index of nestest cluster center */
                     index = find_nearest_cluster(numClusters, numCoords,
                                                  objects[i], clusters);
 
                     /* if membership changes, increase delta by 1 */
-                    if (membership[i] != index) delta += 1;
+                    if (membership[i] != index) int_delta += 1;
 
                     /* assign the membership to object i */
                     membership[i] = index;
@@ -272,7 +273,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
             newClusterSize[i] = 0;   /* set back to 0 */
         }
             
-        delta /= numObjs;
+        delta = (float)(int_delta) / numObjs;
     } while (delta > threshold && loop++ < 500);
 
     if (_debug) {
