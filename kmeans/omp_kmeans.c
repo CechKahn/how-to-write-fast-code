@@ -78,7 +78,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
                    int    *membership)        /* out: [numObjs] */
 {
 
-    int      i, j, k, index, loop=0;
+    int      i, j, k, loop=0;
     int     *newClusterSize; /* [numClusters]: no. objects assigned in each
                                 new cluster */
     int     delta;          /* % of objects change their clusters */
@@ -157,7 +157,6 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
                 shared(objects,clusters,membership,local_newClusters,local_newClusterSize)
         {
             int tid = omp_get_thread_num();
-
             #pragma omp for \
                           private(i,j) \
                           firstprivate(numObjs,numClusters,numCoords) \
@@ -169,16 +168,16 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
               for (j = 1; j < numClusters; j++) {
                 float dist = 0;
                 float *coord2 = clusters[j];
-                for (k = 0; k < numDims; k++) {
+                for (k = 0; k < numCoords; k++) {
                   dist += (coord1[k] - coord2[k]) * (coord1[k] - coord2[k]);
                 }
                 if (dist < min_dist) {
                   min_dist = dist;
-                  index = i;
+                  index = j;
                 }
               }
-              // if (membership[i] != index) delta += 1;
-              delta += ((membership[i] ^ index) == 0);
+              //if (membership[i] != index) delta += 1;
+              delta += ((membership[i] ^ index) != 0);
               membership[i] = index;
               local_newClusterSize[tid][index]++;
               for (j = 0; j < numCoords; j++) {
