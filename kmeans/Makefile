@@ -40,7 +40,7 @@
 all: seq omp cuda
 
 DFLAGS      =
-OPTFLAGS    = -O3
+OPTFLAGS    = -g
 INCFLAGS    = -I.
 CFLAGS      = $(OPTFLAGS) $(DFLAGS) $(INCFLAGS)
 NVCCFLAGS   = $(CFLAGS) --ptxas-options=-v -arch=sm_20
@@ -51,7 +51,7 @@ LIBS        =
 # Here, I am using gcc and its openmp compile flag is -fopenmp
 # If icc is used, please us -opnemp
 #
-OMPFLAGS    = -fopenmp -lm
+OMPFLAGS    = -fopenmp -lm -msse2 -msse3
 
 CC          = gcc
 MPICC       = mpicc

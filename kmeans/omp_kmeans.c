@@ -38,15 +38,14 @@ float euclid_dist_2(int    numdims,  /* no. dimensions */
   int i;
   __m128 ans128 = _mm_setzero_ps();
   __m128 c1, c2, subv;
+  float ans_vec[4];
 
-  __m
   for (i=0; i<numdims; i+=4) {
     c1 = _mm_load_ps(&coord1[i]);
     c2 = _mm_load_ps(&coord2[i]);
     subv = _mm_sub_ps(c1, c2);
     ans128 = _mm_mul_ps(subv, subv);
   }
-  float ans_vec[4];
   _mm_store_ps(ans_vec, ans128);
   return ans_vec[0] + ans_vec[1] + ans_vec[2] + ans_vec[3];
 }
