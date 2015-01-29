@@ -80,7 +80,8 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
     int      i, j, k, index, loop=0;
     int     *newClusterSize; /* [numClusters]: no. objects assigned in each
                                 new cluster */
-    float    delta;          /* % of objects change their clusters */
+    int     delta;          /* % of objects change their clusters */
+    int     threshold_int = std::floor(threshold * numObjs);
     float  **clusters;       /* out: [numClusters][numCoords] */
     float  **newClusters;    /* [numClusters][numCoords] */
     double   timing;
@@ -150,72 +151,44 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
 
     if (_debug) timing = omp_get_wtime();
     do {
-        delta = 0.0;
+        delta = 0;
 
-        if (is_perform_atomic) {
-            #pragma omp parallel for \
-                    private(i,j,index) \
-                    firstprivate(numObjs,numClusters,numCoords) \
-                    shared(objects,clusters,membership,newClusters,newClusterSize) \
-                    schedule(static) \
-                    reduction(+:delta)
+        #pragma omp parallel \
+                shared(objects,clusters,membership,local_newClusters,local_newClusterSize)
+        {
+            int tid = omp_get_thread_num();
+            #pragma omp for \
+                        private(i,j,index) \
+                        firstprivate(numObjs,numClusters,numCoords) \
+                        schedule(static) \
+                        reduction(+:delta)
             for (i=0; i<numObjs; i++) {
                 /* find the array index of nestest cluster center */
-                index = find_nearest_cluster(numClusters, numCoords, objects[i],
-                                             clusters);
+                index = find_nearest_cluster(numClusters, numCoords,
+                                             objects[i], clusters);
 
                 /* if membership changes, increase delta by 1 */
-                if (membership[i] != index) delta += 1.0;
+                if (membership[i] != index) delta += 1;
 
                 /* assign the membership to object i */
                 membership[i] = index;
 
-                /* update new cluster centers : sum of objects located within */
-                #pragma omp atomic
-                newClusterSize[index]++;
+                /* update new cluster centers : sum of all objects located
+                   within (average will be performed later) */
+                local_newClusterSize[tid][index]++;
                 for (j=0; j<numCoords; j++)
-                    #pragma omp atomic
-                    newClusters[index][j] += objects[i][j];
+                    local_newClusters[tid][index][j] += objects[i][j];
             }
-        }
-        else {
-            #pragma omp parallel \
-                    shared(objects,clusters,membership,local_newClusters,local_newClusterSize)
-            {
-                int tid = omp_get_thread_num();
-                #pragma omp for \
-                            private(i,j,index) \
-                            firstprivate(numObjs,numClusters,numCoords) \
-                            schedule(static) \
-                            reduction(+:delta)
-                for (i=0; i<numObjs; i++) {
-                    /* find the array index of nestest cluster center */
-                    index = find_nearest_cluster(numClusters, numCoords,
-                                                 objects[i], clusters);
+        } /* end of #pragma omp parallel */
 
-                    /* if membership changes, increase delta by 1 */
-                    if (membership[i] != index) delta += 1.0;
-
-                    /* assign the membership to object i */
-                    membership[i] = index;
-
-                    /* update new cluster centers : sum of all objects located
-                       within (average will be performed later) */
-                    local_newClusterSize[tid][index]++;
-                    for (j=0; j<numCoords; j++)
-                        local_newClusters[tid][index][j] += objects[i][j];
-                }
-            } /* end of #pragma omp parallel */
-
-            /* let the main thread perform the array reduction */
-            for (i=0; i<numClusters; i++) {
-                for (j=0; j<nthreads; j++) {
-                    newClusterSize[i] += local_newClusterSize[j][i];
-                    local_newClusterSize[j][i] = 0.0;
-                    for (k=0; k<numCoords; k++) {
-                        newClusters[i][k] += local_newClusters[j][i][k];
-                        local_newClusters[j][i][k] = 0.0;
-                    }
+        /* let the main thread perform the array reduction */
+        for (i=0; i<numClusters; i++) {
+            for (j=0; j<nthreads; j++) {
+                newClusterSize[i] += local_newClusterSize[j][i];
+                local_newClusterSize[j][i] = 0;
+                for (k=0; k<numCoords; k++) {
+                    newClusters[i][k] += local_newClusters[j][i][k];
+                    local_newClusters[j][i][k] = 0;
                 }
             }
         }
@@ -230,8 +203,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
             newClusterSize[i] = 0;   /* set back to 0 */
         }
             
-        delta /= numObjs;
-    } while (delta > threshold && loop++ < 500);
+    } while (delta > threshold_int && loop++ < 500);
 
     if (_debug) {
         timing = omp_get_wtime() - timing;
