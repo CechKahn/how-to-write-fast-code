@@ -82,7 +82,8 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
     int     *newClusterSize; /* [numClusters]: no. objects assigned in each
                                 new cluster */
     int     delta;          /* % of objects change their clusters */
-    int     threshold_int = (int)floor(threshold * numObjs);
+    int     magnitude = (int)(1.0 / threshold);
+    int     threshold_int = numObjs;
     float  **clusters;       /* out: [numClusters][numCoords] */
     float  **newClusters;    /* [numClusters][numCoords] */
     double   timing;
@@ -121,32 +122,30 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
     for (i=1; i<numClusters; i++)
         newClusters[i] = newClusters[i-1] + numCoords;
 
-    if (!is_perform_atomic) {
-        /* each thread calculates new centers using a private space,
-           then thread 0 does an array reduction on them. This approach
-           should be faster */
-        local_newClusterSize    = (int**) malloc(nthreads * sizeof(int*));
-        assert(local_newClusterSize != NULL);
-        local_newClusterSize[0] = (int*)  calloc(nthreads*numClusters,
-                                                 sizeof(int));
-        assert(local_newClusterSize[0] != NULL);
-        for (i=1; i<nthreads; i++)
-            local_newClusterSize[i] = local_newClusterSize[i-1]+numClusters;
+    /* each thread calculates new centers using a private space,
+       then thread 0 does an array reduction on them. This approach
+       should be faster */
+    local_newClusterSize    = (int**) malloc(nthreads * sizeof(int*));
+    assert(local_newClusterSize != NULL);
+    local_newClusterSize[0] = (int*)  calloc(nthreads*numClusters,
+                                             sizeof(int));
+    assert(local_newClusterSize[0] != NULL);
+    for (i=1; i<nthreads; i++)
+        local_newClusterSize[i] = local_newClusterSize[i-1]+numClusters;
 
-        /* local_newClusters is a 3D array */
-        local_newClusters    =(float***)malloc(nthreads * sizeof(float**));
-        assert(local_newClusters != NULL);
-        local_newClusters[0] =(float**) malloc(nthreads * numClusters *
-                                               sizeof(float*));
-        assert(local_newClusters[0] != NULL);
-        for (i=1; i<nthreads; i++)
-            local_newClusters[i] = local_newClusters[i-1] + numClusters;
-        for (i=0; i<nthreads; i++) {
-            for (j=0; j<numClusters; j++) {
-                local_newClusters[i][j] = (float*)calloc(numCoords,
-                                                         sizeof(float));
-                assert(local_newClusters[i][j] != NULL);
-            }
+    /* local_newClusters is a 3D array */
+    local_newClusters    =(float***)malloc(nthreads * sizeof(float**));
+    assert(local_newClusters != NULL);
+    local_newClusters[0] =(float**) malloc(nthreads * numClusters *
+                                           sizeof(float*));
+    assert(local_newClusters[0] != NULL);
+    for (i=1; i<nthreads; i++)
+        local_newClusters[i] = local_newClusters[i-1] + numClusters;
+    for (i=0; i<nthreads; i++) {
+        for (j=0; j<numClusters; j++) {
+            local_newClusters[i][j] = (float*)calloc(numCoords,
+                                                     sizeof(float));
+            assert(local_newClusters[i][j] != NULL);
         }
     }
 
@@ -203,8 +202,9 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
             }
             newClusterSize[i] = 0;   /* set back to 0 */
         }
+        delta *= magnitude;
             
-    } while (delta > threshold_int && loop++ < 500);
+    } while (delta > numObjs && loop++ < 500);
 
     if (_debug) {
         timing = omp_get_wtime() - timing;
