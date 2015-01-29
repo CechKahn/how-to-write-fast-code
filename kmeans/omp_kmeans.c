@@ -122,7 +122,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
     int      i, j, k, index, loop=0;
     int     *newClusterSize; /* [numClusters]: no. objects assigned in each
                                 new cluster */
-    float    delta;          /* % of objects change their clusters */
+    int    delta;          /* % of objects change their clusters */
     float  **clusters;       /* out: [numClusters][numCoords] */
     float  **newClusters;    /* [numClusters][numCoords] */
     double   timing;
@@ -132,7 +132,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
     float ***local_newClusters;    /* [nthreads][numClusters][numCoords] */
 
     nthreads = omp_get_max_threads();
-
+		is_perform_atomic = 0;
     /* allocate a 2D space for returning variable clusters[] (coordinates
        of cluster centers) */
     clusters    = (float**) malloc(numClusters *             sizeof(float*));
@@ -192,7 +192,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
 
     if (_debug) timing = omp_get_wtime();
     do {
-        delta = 0.0;
+        delta = 0;
 
         if (is_perform_atomic) {
             #pragma omp parallel for \
@@ -207,7 +207,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
                                              clusters);
 
                 /* if membership changes, increase delta by 1 */
-                if (membership[i] != index) delta += 1.0;
+                if (membership[i] != index) delta += 1;
 
                 /* assign the membership to object i */
                 membership[i] = index;
@@ -236,7 +236,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
                                                  objects[i], clusters);
 
                     /* if membership changes, increase delta by 1 */
-                    if (membership[i] != index) delta += 1.0;
+                    if (membership[i] != index) delta += 1;
 
                     /* assign the membership to object i */
                     membership[i] = index;
