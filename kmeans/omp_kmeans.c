@@ -145,6 +145,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
 #ifdef SSE_EUCLID_OPTIMIZED
 		float **ori_objects = objects;
 		objects = (float **) malloc(sizeof(float*) * numObjs * numCoords);
+		#pragma omp parallel for
 		for(i = 0; i < numObjs;i++)
 		{
 			posix_memalign((void **)&objects[i],16,sizeof(float) * numCoords);
@@ -174,6 +175,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
             clusters[i][j] = objects[i][j];
 
     /* initialize membership[] */
+		//#pragma omp parallel for
     for (i=0; i<numObjs; i++) membership[i] = -1;
 
     /* need to initialize newClusterSize and newClusters[0] to all 0 */
@@ -252,7 +254,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
                     shared(objects,clusters,membership,local_newClusters,local_newClusterSize,local_delta)
             {
                 int tid = omp_get_thread_num();
-                #pragma omp for \
+								#pragma omp for \
                             private(i,j,index) \
                             schedule(static) 
                 for (i=0; i<numObjs; i++) {
