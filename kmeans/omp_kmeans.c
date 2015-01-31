@@ -19,7 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <string.h>
 #include <omp.h>
 #include "kmeans.h"
 #include <pmmintrin.h>
@@ -27,8 +27,8 @@
 
 #define SQR(a) ((a) * (a))
 
-//#define EUCLID_DIST_OPTIMIZED
-#define SSE_EUCLID_OPTIMIZED
+#define EUCLID_DIST_OPTIMIZED
+//#define SSE_EUCLID_OPTIMIZED
 //#define NO_OPTIMIZED
 typedef union
 {
@@ -60,12 +60,18 @@ float euclid_dist_2(int    numdims,  /* no. dimensions */
 	{
 		ext x;
 		__m128 tmp;
+		__m128 *p1, *p2;
 		for(i = 0;(i + 3) < numdims;i+=4)
 		{
+			p1 = (__m128*)&coord1[i];
+			p2 = (__m128*)&coord2[i];
+			tmp = _mm_sub_ps(*p1,*p2);
+			/*
 			tmp = _mm_set_ps(coord1[i] - coord2[i],\
 															coord1[i+1] - coord2[i+1],\
 															coord1[i+2] - coord2[i+2],\
 															coord1[i+3] - coord2[i+3]);
+			*/
 			tmp = _mm_mul_ps(tmp,tmp);
 			x.m = tmp;
 			ans += (x.f[0] + x.f[1] + x.f[2]+ x.f[3]);
@@ -123,7 +129,10 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
     int     *newClusterSize; /* [numClusters]: no. objects assigned in each
                                 new cluster */
     float    delta;          /* % of objects change their clusters */
-    unsigned int_delta;
+    unsigned *local_delta;
+		int int_delta;
+		unsigned int_threshold = threshold * numObjs; 
+		
 		float  **clusters;       /* out: [numClusters][numCoords] */
     float  **newClusters;    /* [numClusters][numCoords] */
     double   timing;
@@ -132,16 +141,32 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
     int    **local_newClusterSize; /* [nthreads][numClusters] */
     float ***local_newClusters;    /* [nthreads][numClusters][numCoords] */
 
-    nthreads = omp_get_max_threads();
+//--------------------------------EDIT HERE-----------------------------//
+#ifdef SSE_EUCLID_OPTIMIZED
+		float **ori_objects = objects;
+		objects = (float **) malloc(sizeof(float*) * numObjs * numCoords);
+		for(i = 0; i < numObjs;i++)
+		{
+			posix_memalign((void **)&objects[i],16,sizeof(float) * numCoords);
+			memcpy(objects[i],ori_objects[i],sizeof(float) * numCoords);
+    }
+#endif
+//--------------------------------EDIT HERE----------------------------//
+		nthreads = omp_get_max_threads();
+
+		local_delta = (int*) malloc(sizeof(int) * nthreads);
+		memset(local_delta,0,sizeof(int) * nthreads);
 		is_perform_atomic = 0;
     /* allocate a 2D space for returning variable clusters[] (coordinates
        of cluster centers) */
-    clusters    = (float**) malloc(numClusters *             sizeof(float*));
+    clusters    = (float**) malloc(numClusters * sizeof(float*));
     assert(clusters != NULL);
-    clusters[0] = (float*)  malloc(numClusters * numCoords * sizeof(float));
-    assert(clusters[0] != NULL);
-    for (i=1; i<numClusters; i++)
-        clusters[i] = clusters[i-1] + numCoords;
+    
+		//clusters[0] = (float*)  malloc(numClusters * numCoords * sizeof(float));
+    //assert(clusters[0] != NULL);
+    for (i=0; i<numClusters; i++)
+				posix_memalign((void**) &clusters[i],16,sizeof(float) * numCoords);
+        //clusters[i] = clusters[i-1] + numCoords;
 
     /* pick first numClusters elements of objects[] as initial cluster centers*/
     for (i=0; i<numClusters; i++)
@@ -193,7 +218,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
 
     if (_debug) timing = omp_get_wtime();
     do {
-        int_delta = 0;
+        int_delta = 0; 
 
         if (is_perform_atomic) {
             #pragma omp parallel for \
@@ -222,22 +247,21 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
             }
         }
         else {
+						int_delta = 0;
             #pragma omp parallel \
-                    shared(objects,clusters,membership,local_newClusters,local_newClusterSize)
+                    shared(objects,clusters,membership,local_newClusters,local_newClusterSize,local_delta)
             {
                 int tid = omp_get_thread_num();
                 #pragma omp for \
                             private(i,j,index) \
-                            firstprivate(numObjs,numClusters,numCoords) \
-                            schedule(static) \
-                            reduction(+:int_delta)
+                            schedule(static) 
                 for (i=0; i<numObjs; i++) {
                     /* find the array index of nestest cluster center */
                     index = find_nearest_cluster(numClusters, numCoords,
                                                  objects[i], clusters);
 
                     /* if membership changes, increase delta by 1 */
-                    if (membership[i] != index) int_delta += 1;
+                    if (membership[i] != index) local_delta[tid] += 1;
 
                     /* assign the membership to object i */
                     membership[i] = index;
@@ -254,7 +278,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
             for (i=0; i<numClusters; i++) {
                 for (j=0; j<nthreads; j++) {
                     newClusterSize[i] += local_newClusterSize[j][i];
-                    local_newClusterSize[j][i] = 0.0;
+                    local_newClusterSize[j][i] = 0;
                     for (k=0; k<numCoords; k++) {
                         newClusters[i][k] += local_newClusters[j][i][k];
                         local_newClusters[j][i][k] = 0.0;
@@ -272,9 +296,13 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
             }
             newClusterSize[i] = 0;   /* set back to 0 */
         }
-            
-        delta = (float)(int_delta) / numObjs;
-    } while (delta > threshold && loop++ < 500);
+        for(i = 0; i < nthreads;i++)
+				{
+					int_delta += local_delta[i];
+					local_delta[i] = 0;
+				}
+				//delta = (float)(int_delta) / numObjs;
+    } while (int_delta > int_threshold && loop++ < 500);
 
     if (_debug) {
         timing = omp_get_wtime() - timing;
@@ -291,6 +319,15 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
         free(local_newClusters[0]);
         free(local_newClusters);
     }
+//----------------EDIT HERE--------------//
+#ifdef SSE_EUCLID_OPTIMIZED
+		for(i = 0;i < numObjs;i++)
+			free(objects[i]);
+		free(objects);
+		objects = ori_objects;
+#endif
+//----------------EDIT HERE--------------//		
+		free(local_delta);
     free(newClusters[0]);
     free(newClusters);
     free(newClusterSize);
