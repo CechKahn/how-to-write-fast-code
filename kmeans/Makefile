@@ -40,14 +40,14 @@
 all: seq omp cuda
 
 DFLAGS      =
-OPTFLAGS    = -O -NDEBUG
-OPTFLAGS    = -g -pg
+OPTFLAGS    = -O3 #-DNDEBUG
+#OPTFLAGS    = -g -pg
 INCFLAGS    = -I.
 CFLAGS      = $(OPTFLAGS) $(DFLAGS) $(INCFLAGS)
 NVCCFLAGS   = $(CFLAGS) --ptxas-options=-v -arch=sm_20
 LDFLAGS     = $(OPTFLAGS)
 LIBS        =
-SSEFLAGS    = -msse3
+SSEFLAGS    = -msse3 -msse4
 # please check the compile to the one you use and the openmp flag
 # Here, I am using gcc and its openmp compile flag is -fopenmp
 # If icc is used, please us -opnemp
