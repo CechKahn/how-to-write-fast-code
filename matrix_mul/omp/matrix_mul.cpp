@@ -22,6 +22,7 @@
 #include <memory.h>
 #include <cassert>
 #include <omp.h>
+#include <inttypes.h>
 #include "matrix_mul.h"
 
 extern "C"
@@ -57,11 +58,15 @@ void
         unsigned int sq_dimension ) {
       // seems we can't modify sq_matrix_1 and sq_matrix_2....
 
+      cout << "\n" << uintptr_t(sq_matrix_1) << endl;
+      assert(uintptr_t(sq_matrix_1) % 16 == 0);
       uint mask4 = 0x3;
       if ((sq_dimension & mask4) > 0) {
         uint dim4 = sq_dimension + 4 - (sq_dimension & mask4);
         float *sq1 = (float *)malloc(dim4*dim4*sizeof(float));
         float *sq2_t = (float *)malloc(dim4*dim4*sizeof(float));
+        assert(uintptr_t(sq1) % 16 == 0);
+        assert(uintptr_t(sq2_t) % 16 == 0);
         for (uint i = 0; i < sq_dimension; i++) {
           uint base_i4 = i*dim4;
           uint base_i = i*sq_dimension;

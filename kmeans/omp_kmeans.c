@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h> // memcpy
+#include <inttypes.h>
 
 #include <omp.h>
 #include <pmmintrin.h>
@@ -44,7 +45,7 @@ float euclid_dist_2(int    numdims,  /* no. dimensions */
     c1 = _mm_load_ps(&coord1[i]);
     c2 = _mm_load_ps(&coord2[i]);
     subv = _mm_sub_ps(c1, c2);
-    ans128 = _mm_mul_ps(subv, subv);
+    ans128 = _mm_add_ps(ans128, _mm_mul_ps(subv, subv));
   }
   _mm_store_ps(ans_vec, ans128);
   return ans_vec[0] + ans_vec[1] + ans_vec[2] + ans_vec[3];
@@ -111,10 +112,10 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
     float **newObjects = (float **)malloc(numObjs * sizeof(float*));
     assert(newObjects != NULL);
     newObjects[0] = (float *)calloc(numObjs * newNumCoords, sizeof(float));
-    assert(newObjects != NULL);
+    assert(newObjects[0] != NULL);
     memcpy(newObjects[0], objects[0], numCoords * sizeof(float));
     for (i = 1; i < numObjs; i++) {
-      newObjects[i] = newObjects[i-1] + numCoords;
+      newObjects[i] = newObjects[i-1] + newNumCoords;
       memcpy(newObjects[i], objects[i], numCoords * sizeof(float));
     }
 

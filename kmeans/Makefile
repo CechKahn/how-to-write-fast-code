@@ -40,7 +40,7 @@
 all: seq omp cuda
 
 DFLAGS      =
-OPTFLAGS    = -g
+OPTFLAGS    = -O3
 INCFLAGS    = -I.
 CFLAGS      = $(OPTFLAGS) $(DFLAGS) $(INCFLAGS)
 NVCCFLAGS   = $(CFLAGS) --ptxas-options=-v -arch=sm_20
