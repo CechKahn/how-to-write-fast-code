@@ -41,7 +41,7 @@ all: seq omp cuda
 
 DFLAGS      =
 OPTFLAGS    = -O3 #-DNDEBUG
-#OPTFLAGS    = -g -pg
+OPTFLAGS    = -g -pg
 INCFLAGS    = -I.
 CFLAGS      = $(OPTFLAGS) $(DFLAGS) $(INCFLAGS)
 NVCCFLAGS   = $(CFLAGS) --ptxas-options=-v -arch=sm_20
@@ -70,11 +70,11 @@ OMP_SRC     = omp_main.c \
 OMP_OBJ     = $(OMP_SRC:%.c=%.o)
 
 omp_kmeans.o: omp_kmeans.c $(H_FILES)
-	$(CC) $(CFLAGS) $(OMPFLAGS) $(SSEFLAGS) -c omp_kmeans.c
+	$(CC) $(CFLAGS) $(OMPFLAGS) $(SSEFLAGS) -c omp_kmeans.c -O3
 
 omp: omp_main
 omp_main: $(OMP_OBJ) file_io.o
-	$(CC) $(LDFLAGS) $(OMPFLAGS) $(SSEFLAGS) -o omp_main $(OMP_OBJ) file_io.o $(LIBS)
+	$(CC) $(LDFLAGS) $(OMPFLAGS) $(SSEFLAGS) -o omp_main $(OMP_OBJ) file_io.o $(LIBS) -O3
 
 #------   sequential version -----------------------------------------
 SEQ_SRC     = seq_main.c   \
@@ -88,7 +88,7 @@ $(SEQ_OBJ): $(H_FILES)
 
 seq: seq_main
 seq_main: $(SEQ_OBJ) $(H_FILES)
-	$(CC) $(LDFLAGS) -o seq_main $(SEQ_OBJ) $(LIBS)
+	$(CC) $(LDFLAGS) -o seq_main $(SEQ_OBJ) $(LIBS) -O3
 
 # ------------------------------------------------------------------------------
 # CUDA Version
