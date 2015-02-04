@@ -40,6 +40,7 @@ float euclid_dist_2(int    numdims,  /* no. dimensions */
   float c1,c2,c3,c4;
   float ans = 0;
 
+  // loop unrolling
   for (i = 0; i <numdims; i+=4) {
     c1 = coord1[i] - coord2[i];
     c2 = coord1[i+1] - coord2[i+1];
