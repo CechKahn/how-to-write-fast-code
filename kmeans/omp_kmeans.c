@@ -36,19 +36,18 @@ float euclid_dist_2(int    numdims,  /* no. dimensions */
     float *coord1,   /* [numdims] */
     float *coord2)   /* [numdims] */
 {
-  int i;
-  __m128 ans128 = _mm_setzero_ps();
-  __m128 c1, c2, subv;
-  float ans_vec[4];
+  int i,j;
+  float c1,c2,c3,c4;
+  float ans = 0;
 
-  for (i=0; i<numdims; i+=4) {
-    c1 = _mm_load_ps(&coord1[i]);
-    c2 = _mm_load_ps(&coord2[i]);
-    subv = _mm_sub_ps(c1, c2);
-    ans128 = _mm_add_ps(ans128, _mm_mul_ps(subv, subv));
+  for (i = 0; i <numdims; i+=4) {
+    c1 = coord1[i] - coord2[i];
+    c2 = coord1[i+1] - coord2[i+1];
+    c3 = coord1[i+2] - coord2[i+2];
+    c4 = coord1[i+3] - coord2[i+3];
+    ans += c1*c1 + c2*c2 + c3*c3 + c4*c4;
   }
-  _mm_store_ps(ans_vec, ans128);
-  return ans_vec[0] + ans_vec[1] + ans_vec[2] + ans_vec[3];
+  return ans;
 }
 
 /*----< find_nearest_cluster() >---------------------------------------------*/
@@ -106,6 +105,8 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
   int isMultOf4 = 1;
 
   int mask4 = 0x3;
+  // if numCoords is not multiple of 4, then re-arrange the arrage so that
+  // numCoords is multiple of 4.
   if ((numCoords & mask4) > 0) {
     isMultOf4 = 0;
     int newNumCoords = numCoords + 4 - (numCoords & mask4);
