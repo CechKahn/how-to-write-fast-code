@@ -148,6 +148,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
 	int    **local_newClusterSize; /* [nthreads][numClusters] */
 	float ***local_newClusters;    /* [nthreads][numClusters][numCoords] */
 
+	omp_set_num_threads(32);
 //--------------------------------EDIT HERE-----------------------------//
 #ifdef SSE_EUCLID_OPTIMIZED
 	float **ori_objects = objects;
@@ -173,14 +174,16 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
 	clusters = (float**) malloc(numClusters * sizeof(float*));
 	assert(clusters != NULL);
 	
-	clusters[0] = (float*)  malloc(numClusters * numCoords * sizeof(float));
-	assert(clusters[0] != NULL);
+
+
 
 #ifdef SSE_EUCLID_OPTIMIZED
 	for (i=0; i<numClusters; i++)
 		posix_memalign((void**) &clusters[i],16,sizeof(float) * numCoords);
 #else
-	for (i=0; i<numClusters; i++)
+	clusters[0] = (float*) malloc(numClusters * numCoords * sizeof(float));
+	assert(clusters[0] != NULL);
+	for (i=1; i<numClusters; i++)
 		clusters[i] = clusters[i-1] + numCoords;
 #endif
 
