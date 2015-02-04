@@ -58,7 +58,6 @@ void
         unsigned int sq_dimension ) {
       // seems we can't modify sq_matrix_1 and sq_matrix_2....
 
-      cout << "\n" << uintptr_t(sq_matrix_1) << endl;
       assert(uintptr_t(sq_matrix_1) % 16 == 0);
       uint mask4 = 0x3;
       if ((sq_dimension & mask4) > 0) {
