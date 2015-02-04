@@ -14,10 +14,10 @@ $(PROJ): $(OBJS)
 	$(CC) $(OMPFLAGS) $(LDFLAGS) $^ -o $@ $(LIBS) -O3
 
 %.o : %.cpp
-	$(CC) $(OMPFLAGS) $(CFLAGS) $< -o $@ $(SIMDFLAGS)
+	$(CC) $(OMPFLAGS) $(CFLAGS) $< -o $@ $(SIMDFLAGS) -O3
 
 %.o : %.cpp %.h
-	$(CC) $(OMPFLAGS) $(CFLAGS) $< -o $@ $(SIMDFLAGS)
+	$(CC) $(OMPFLAGS) $(CFLAGS) $< -o $@ $(SIMDFLAGS) -O3
 
 clean:
 	rm -f $(PROJ) $(OBJS) *.xml

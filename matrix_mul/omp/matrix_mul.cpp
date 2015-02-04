@@ -22,7 +22,9 @@
 #include <string.h>
 #include <xmmintrin.h>
 
-#define NUM_OF_THREADS 8
+#define NUM_OF_THREADS 16
+#define MANUAL_MULTI_OP
+#define BLOCK_MULTI 
 
 namespace omp
 {
@@ -30,10 +32,15 @@ namespace omp
 inline void matrix_multiplication_subblock(float *m1, float *m2, float *result,unsigned int &block_size,unsigned int &sq_dimension);
 
 void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_matrix_result, unsigned int sq_dimension ){
+	omp_set_num_threads(NUM_OF_THREADS);
 	memset(sq_matrix_result,0,sizeof(float) * sq_dimension * sq_dimension);
 	bool enable_block_mul = false;
 	if(sq_dimension >= 256)
+#ifdef BLOCK_MULTI
 		enable_block_mul = true;
+#else
+		enable_block_mul = false;
+#endif
 	else
 		enable_block_mul = false;
 	if(enable_block_mul)
@@ -42,7 +49,6 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 		
 		while(sq_dimension % blk_range != 0)
 			blk_range--;
-
 		#pragma omp parallel for \
 					shared(sq_matrix_1,sq_matrix_2,sq_matrix_result)\
 					schedule(static)
@@ -68,8 +74,24 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 			for(unsigned int j = 0; j < sq_dimension; j++) 
 			{
 				//sq_matrix_result[i*sq_dimension + j] = 0;
-				for (unsigned int k = 0; k < sq_dimension; k++)
-					sq_matrix_result[i*sq_dimension + j] += sq_matrix_1[i*sq_dimension + k] * sq_matrix_2[k*sq_dimension + j];
+				for (unsigned int k = 0; k < sq_dimension;)
+				{
+#ifdef MANUAL_MULTI_OP
+					if(k + 3 < sq_dimension)
+					{
+						sq_matrix_result[i*sq_dimension + j] += (sq_matrix_1[i*sq_dimension + k] * sq_matrix_2[k*sq_dimension + j] + \
+																										sq_matrix_1[i*sq_dimension + k + 1] * sq_matrix_2[(k + 1) *sq_dimension + j] + \
+																										sq_matrix_1[i*sq_dimension + k + 2] * sq_matrix_2[(k + 2) *sq_dimension + j] + \
+																										sq_matrix_1[i*sq_dimension + k + 3] * sq_matrix_2[(k + 3) *sq_dimension + j]);
+						k+=4;
+					}
+					else
+#endif
+					{
+						sq_matrix_result[i*sq_dimension + j] += sq_matrix_1[i*sq_dimension + k] * sq_matrix_2[k*sq_dimension + j];
+						k++;
+					}
+				}
 			}
 		}// End of parallel region
 	}
@@ -93,6 +115,7 @@ inline void matrix_multiplication_subblock(float *m1, float *m2, float *result,u
 		for(col = 0;col < block_size;col++)
 			for(count = 0;count < block_size;)
 			{
+#ifdef MANUAL_MULTI_OP
 				if(count + 4 < block_size)
 				{
 					//tried SSE, cannot directly use the address due to alignment problem
@@ -105,6 +128,7 @@ inline void matrix_multiplication_subblock(float *m1, float *m2, float *result,u
 					count+=4;
 				}
 				else
+#endif
 				{
 					result[row * sq_dimension + col] += m1[row * sq_dimension + count] * m2[count * sq_dimension + col];
 					count++;
