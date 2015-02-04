@@ -174,9 +174,11 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
         for (j=0; j<numCoords; j++)
             clusters[i][j] = objects[i][j];
 
-    /* initialize membership[] */
-		//#pragma omp parallel for
-    for (i=0; i<numObjs; i++) membership[i] = -1;
+    /* initialize membership[] */	
+		  #pragma omp parallel for\
+			shared(membership)\
+			schedule(static)
+	 	for (i=0; i<numObjs; i++) membership[i] = -1;
 
     /* need to initialize newClusterSize and newClusters[0] to all 0 */
     newClusterSize = (int*) calloc(numClusters, sizeof(int));
@@ -255,7 +257,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
             {
                 int tid = omp_get_thread_num();
 								#pragma omp for \
-                            private(i,j,index) \
+                            private(j,index) \
                             schedule(static) 
                 for (i=0; i<numObjs; i++) {
                     /* find the array index of nestest cluster center */
@@ -263,11 +265,11 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
                                                  objects[i], clusters);
 
                     /* if membership changes, increase delta by 1 */
-                    if (membership[i] != index) local_delta[tid] += 1;
-
-                    /* assign the membership to object i */
-                    membership[i] = index;
-
+                    if (membership[i] != index)
+										{
+											local_delta[tid] += 1;/* assign the membership to object i */
+                    	membership[i] = index;
+										}
                     /* update new cluster centers : sum of all objects located
                        within (average will be performed later) */
                     local_newClusterSize[tid][index]++;
@@ -277,8 +279,14 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
             } /* end of #pragma omp parallel */
 
             /* let the main thread perform the array reduction */
-            for (i=0; i<numClusters; i++) {
-                for (j=0; j<nthreads; j++) {
+           	/* 
+						#pragma omp parallel for\
+							shared(i) \
+							private(j,k)\
+							schedule(static)
+						*/
+						for (i=0; i<numClusters; i++) {
+								for (j=0; j<nthreads; j++) {
                     newClusterSize[i] += local_newClusterSize[j][i];
                     local_newClusterSize[j][i] = 0;
                     for (k=0; k<numCoords; k++) {
