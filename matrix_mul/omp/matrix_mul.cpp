@@ -51,7 +51,7 @@ void matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_mat
 			blk_range--;
 		#pragma omp parallel for \
 					shared(sq_matrix_1,sq_matrix_2,sq_matrix_result)\
-					schedule(static)
+					schedule(static)	
 		for(unsigned j = 0;j < sq_dimension;j+=blk_range)
 		{
 			for(unsigned i = 0;i < sq_dimension;i+=blk_range)

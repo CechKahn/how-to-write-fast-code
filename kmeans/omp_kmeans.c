@@ -32,10 +32,12 @@
 	simple instruction optimization achieve even more speed up than SSE,
 	because of the memory alignment problem.
 */
-#define EUCLID_DIST_OPTIMIZED
+//#define EUCLID_DIST_OPTIMIZED
 //#define SSE_EUCLID_OPTIMIZED
-//#define NO_OPTIMIZED
+#define NO_OPTIMIZED
 
+#define NUM_OF_THREADS 32
+#define ATOMIC_DISABLE
 
 typedef union
 {
@@ -148,7 +150,9 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
 	int    **local_newClusterSize; /* [nthreads][numClusters] */
 	float ***local_newClusters;    /* [nthreads][numClusters][numCoords] */
 
-	omp_set_num_threads(32);
+#ifdef NUM_OF_THREADS
+	omp_set_num_threads(NUM_OF_THREADS);
+#endif
 //--------------------------------EDIT HERE-----------------------------//
 #ifdef SSE_EUCLID_OPTIMIZED
 	float **ori_objects = objects;
@@ -166,9 +170,10 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
 	local_delta = (int*) malloc(sizeof(int) * nthreads);
 	memset(local_delta,0,sizeof(int) * nthreads);
 
+#ifdef ATOMIC_DISABLE
 	//force is_perform_atomic to be 0, avoid atomic operation
 	is_perform_atomic = 0;
-
+#endif
 	/* allocate a 2D space for returning variable clusters[] (coordinates
 	   of cluster centers) */
 	clusters = (float**) malloc(numClusters * sizeof(float*));
