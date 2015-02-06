@@ -107,7 +107,8 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
 
   int mask4 = 0x3;
   // if numCoords is not multiple of 4, then re-arrange the arrage so that
-  // numCoords is multiple of 4.
+  // numCoords is multiple of 4. This makes sure that data is aligned.
+  // I find that in this case, loop unrolling can achieve the best performance.
   if ((numCoords & mask4) > 0) {
     isMultOf4 = 0;
     int newNumCoords = numCoords + 4 - (numCoords & mask4);
@@ -260,6 +261,7 @@ float** omp_kmeans(int     is_perform_atomic, /* in: */
   free(newClusters[0]);
   free(newClusters);
   free(newClusterSize);
+  // We need to free the memory allocated
   if (!isMultOf4) free(objects);
 
   return clusters;
