@@ -143,9 +143,24 @@ namespace cuda
 		int row = blockIdx.y * blockDim.y + threadIdx.y;
 		int col = blockIdx.x * blockDim.x + threadIdx.x;
 		
+		//printf("blockIdx.x is %d blockIdx.y is %d,gridDim.x %d, gridDim.y %d\n",blockIdx.x,blockIdx.y,gridDim.x, gridDim.y);
 		if(row >= sq_dim || col >= sq_dim)
 			return ;
 		float sum = 0.0f;
+		if(sq_dim % submat_blk_size != 0)
+		{
+			//specially design for non-multiple of block size
+			if(blockIdx.x >= (gridDim.x-1) || blockIdx.y >= (gridDim.y-1))
+			{
+				int i = 0;
+				for(i = 0;i < sq_dim;i++)
+				{
+					sum+=sq_m1[row * sq_dim + i] * sq_m2[i*sq_dim + col];
+				}
+				sq_m3[row * sq_dim + col] = sum;
+				return;
+			}
+		}
 		for(blk_cnt = 0; blk_cnt < sq_dim / submat_blk_size;blk_cnt++)
 		{
 			//block matrix multiplication with shared memory	
@@ -261,11 +276,12 @@ namespace cuda
 #endif
 
 #if OPTIMIZE_OPT == 5
-		dim3 dimBlock(MAX_BLK_DIM,MAX_BLK_DIM);
+		int blk_size = 32;
+		dim3 dimBlock(blk_size,blk_size);
 		dim3 dimGrid(sq_dimension/dimBlock.x+1, sq_dimension/dimBlock.y+1);
 		cudaMemcpy(sq_matrix_1_d,sq_matrix_1,size,cudaMemcpyHostToDevice);
 		cudaMemcpy(sq_matrix_2_d,sq_matrix_2,size,cudaMemcpyHostToDevice);
-		int submat_blk_size = 32;
+		int submat_blk_size = blk_size;
 		matrixMulV5<<<dimGrid, dimBlock, sizeof(float) * submat_blk_size * submat_blk_size * 2>>>(sq_matrix_1_d, sq_matrix_2_d, sq_matrix_result_d, sq_dimension, submat_blk_size);
 #endif
 		}
