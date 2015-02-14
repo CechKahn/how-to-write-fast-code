@@ -162,12 +162,27 @@ namespace cuda
 				return;
 			}
 		}
-		for(blk_cnt = 0; blk_cnt < sq_dim / submat_blk_size;blk_cnt++)
+		int max_blk_cnt;
+		int idx1, idx2, size = sq_dim * sq_dim;
+		if(sq_dim % submat_blk_size == 0)
+			max_blk_cnt = sq_dim / submat_blk_size;
+		else
+			max_blk_cnt = sq_dim / submat_blk_size + 1;
+		
+		for(blk_cnt = 0; blk_cnt < max_blk_cnt;blk_cnt++)
 		{
 			//block matrix multiplication with shared memory	
 			//each thread load one element into sub matrix in sq_m1 and one element into submatrix into sq_m2
-			m[threadIdx.y * submat_blk_size + threadIdx.x] = sq_m1[row * sq_dim + col + blk_cnt * submat_blk_size];
-			m2[threadIdx.y * submat_blk_size + threadIdx.x] = sq_m2[(row + blk_cnt * submat_blk_size) * sq_dim + col];
+			idx1 = row * sq_dim + threadIdx.x + blk_cnt * submat_blk_size;
+			idx2 = (threadIdx.y + blk_cnt * submat_blk_size) * sq_dim + col;
+			if(idx1 < size) 
+				m[threadIdx.y * submat_blk_size + threadIdx.x] = sq_m1[idx1];
+			else
+				m[threadIdx.y * submat_blk_size + threadIdx.x] = 0.0f;
+			if(idx2 < size)
+				m2[threadIdx.y * submat_blk_size + threadIdx.x] = sq_m2[idx2];
+			else
+				m2[threadIdx.y * submat_blk_size + threadIdx.x] = 0.0f;
 			__syncthreads();
 			
 			for(int k = 0; k < submat_blk_size;k++)
