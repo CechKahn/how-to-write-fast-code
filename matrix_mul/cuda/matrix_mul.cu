@@ -147,6 +147,7 @@ namespace cuda
 		if(row >= sq_dim || col >= sq_dim)
 			return ;
 		float sum = 0.0f;
+		//TODO: let non-multiple does not slow it down
 		if(sq_dim % submat_blk_size != 0)
 		{
 			//specially design for non-multiple of block size
