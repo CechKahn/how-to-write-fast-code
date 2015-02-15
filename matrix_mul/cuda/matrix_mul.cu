@@ -143,12 +143,12 @@ namespace cuda
 		int row = blockIdx.y * blockDim.y + threadIdx.y;
 		int col = blockIdx.x * blockDim.x + threadIdx.x;
 		
-		//printf("blockIdx.x is %d blockIdx.y is %d,gridDim.x %d, gridDim.y %d\n",blockIdx.x,blockIdx.y,gridDim.x, gridDim.y);
-		if(row >= sq_dim || col >= sq_dim)
-			return ;
+		//if(row >= sq_dim || col >= sq_dim)
+		//	return ;
+		//if(row == 32 || col == 32)
+		//	printf("Wow\n");
 		float sum = 0.0f;
-		//TODO: let non-multiple does not slow it down
-		if(sq_dim % submat_blk_size != 0)
+		if(false)
 		{
 			//specially design for non-multiple of block size
 			if(blockIdx.x >= (gridDim.x-1) || blockIdx.y >= (gridDim.y-1))
@@ -167,36 +167,37 @@ namespace cuda
 		if(sq_dim % submat_blk_size == 0)
 			max_blk_cnt = sq_dim / submat_blk_size;
 		else
-			max_blk_cnt = sq_dim / submat_blk_size + 1;
+			max_blk_cnt = sq_dim / submat_blk_size+1;
 		
 		for(blk_cnt = 0; blk_cnt < max_blk_cnt;blk_cnt++)
 		{
 			//block matrix multiplication with shared memory	
 			//each thread load one element into sub matrix in sq_m1 and one element into submatrix into sq_m2
+			//for matrix non-multiple of block_size,
+			//bring zero for those un-unified position
 			idx1 = row * sq_dim + threadIdx.x + blk_cnt * submat_blk_size;
 			idx2 = (threadIdx.y + blk_cnt * submat_blk_size) * sq_dim + col;
-			if(idx1 < size) 
+			if(idx1 < size && row < sq_dim) 
 				m[threadIdx.y * submat_blk_size + threadIdx.x] = sq_m1[idx1];
 			else
+			{
 				m[threadIdx.y * submat_blk_size + threadIdx.x] = 0.0f;
-			if(idx2 < size)
+			}
+			if(idx2 < size && col < sq_dim)
 				m2[threadIdx.y * submat_blk_size + threadIdx.x] = sq_m2[idx2];
 			else
+			{
 				m2[threadIdx.y * submat_blk_size + threadIdx.x] = 0.0f;
+			}
 			__syncthreads();
-			
+		
+			//do computation based on that shared memory content
 			for(int k = 0; k < submat_blk_size;k++)
 					sum += m[threadIdx.y * submat_blk_size + k] * m2[k * submat_blk_size + threadIdx.x];
 			__syncthreads();
-		
-		/*
-			//block matrix multiplication without shared memory
-			int max_k = (blk_cnt+1) * submat_blk_size;
-			for(int k = blk_cnt * submat_blk_size; k < max_k;k++)
-				sum += sq_m1[row * sq_dim + k] * sq_m2[k * sq_dim + col];
-		*/
 		}
-		sq_m3[row * sq_dim + col] = sum;
+		if(row < sq_dim && col < sq_dim)
+			sq_m3[row * sq_dim + col] = sum;
 		return ;
 	}
 	
@@ -294,7 +295,18 @@ namespace cuda
 #if OPTIMIZE_OPT == 5
 		int blk_size = 32;
 		dim3 dimBlock(blk_size,blk_size);
-		dim3 dimGrid(sq_dimension/dimBlock.x+1, sq_dimension/dimBlock.y+1);
+		int gridX, gridY;
+		if(sq_dimension % dimBlock.x == 0)
+			gridX = sq_dimension/dimBlock.x;
+		else 
+			gridX = sq_dimension/dimBlock.x + 1;
+		if(sq_dimension % dimBlock.y == 0)
+			gridY = sq_dimension/dimBlock.y;
+		else
+			gridY = sq_dimension/dimBlock.y + 1;
+
+		dim3 dimGrid(gridX, gridY);
+		//printf("\ndimGridX %d, dimGridY %d\n",dimGrid.x,dimGrid.y);
 		cudaMemcpy(sq_matrix_1_d,sq_matrix_1,size,cudaMemcpyHostToDevice);
 		cudaMemcpy(sq_matrix_2_d,sq_matrix_2,size,cudaMemcpyHostToDevice);
 		int submat_blk_size = blk_size;
