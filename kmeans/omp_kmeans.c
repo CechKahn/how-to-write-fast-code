@@ -37,17 +37,17 @@ float euclid_dist_2(int    numdims,  /* no. dimensions */
     float *coord2)   /* [numdims] */
 {
   int i,j;
-  float c1,c2,c3,c4;
+  float c1 = 0, c2 = 0,c3 = 0 ,c4 = 0;
   float ans = 0;
 
   // loop unrolling
   for (i = 0; i <numdims; i+=4) {
-    c1 = coord1[i] - coord2[i];
-    c2 = coord1[i+1] - coord2[i+1];
-    c3 = coord1[i+2] - coord2[i+2];
-    c4 = coord1[i+3] - coord2[i+3];
-    ans += c1*c1 + c2*c2 + c3*c3 + c4*c4;
+    c1 += (coord1[i] - coord2[i]) * (coord1[i] - coord2[i]);
+    c2 += (coord1[i+1] - coord2[i+1]) * (coord1[i+1] - coord2[i+1]);
+    c3 += (coord1[i+2] - coord2[i+2]) * (coord1[i+2] - coord2[i+2]);
+    c4 += (coord1[i+3] - coord2[i+3]) * (coord1[i+3] - coord2[i+3]);
   }
+  ans = c1 + c2 + c3 + c4;
   return ans;
 }
 
