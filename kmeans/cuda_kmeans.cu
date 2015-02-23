@@ -251,6 +251,10 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
     //  two, and it *must* be no larger than the number of bits that will
     //  fit into an unsigned char, the type used to keep track of membership
     //  changes in the kernel.
+
+		//TODO numThreadsPerClusterBlock should be far 
+		//larger than the core count in order to maximize the 
+		//usage of per core in case of memory latency.
     const unsigned int numThreadsPerClusterBlock = 128;
     const unsigned int numClusterBlocks =
         (numObjs + numThreadsPerClusterBlock - 1) / numThreadsPerClusterBlock;
