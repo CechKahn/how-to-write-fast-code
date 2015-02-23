@@ -31,6 +31,21 @@
 #define OPTIMIZE_OPT 5
 namespace cuda
 {
+	//this function generate a transposed matrix 
+	float* transposeMatrix(float *m, int sq_dim)
+	{
+		//transpose the matrix
+		int i = 0, j = 0;
+		float *result_m = (float*) malloc(sq_dim*sq_dim * sizeof(float));
+		for(i = 0; i < sq_dim;i++)
+		{
+			for(j = 0;j < sq_dim;j++)
+			{
+				result_m[j * sq_dim + i] = m[i * sq_dim + j];
+			}
+		}
+		return result_m;
+	}
 	__global__ 
 	void 
 	matrix_mul_kernel(float *sq_matrix_1, float *sq_matrix_2, float *sq_matrix_result, int sq_dimension)
@@ -88,27 +103,6 @@ namespace cuda
 		return ;
 	}
 
-	//this one try to transpose sq_m1 rather than transpose sq_m2
-	__global__
-	void
-	matrixMulV4(float *sq_m1, float *sq_m2, float *sq_m3, int sq_dim)
-	{
-		//memory coaleasing because each thread is accessing sq_m2 in different memory bank
-		//because threadIdx.x is typically different
-		int row = blockIdx.y * blockDim.y + threadIdx.y;
-		int col = blockIdx.x * blockDim.x + threadIdx.x;
-		
-		float sum = 0.0f;
-		if(row >= sq_dim || col >= sq_dim)
-			return ;
-		int i = 0;
-		for(i = 0;i < sq_dim;i++)
-		{
-			sum+=sq_m1[i * sq_dim + row] * sq_m2[i*sq_dim + col];
-		}
-		sq_m3[row * sq_dim + col] = sum;
-	}
-
 	__global__
 	void
 	matrixMulV3(float *sq_m1, float *sq_m2, float *sq_m3, int sq_dim)
@@ -130,40 +124,58 @@ namespace cuda
 			}
 	}
 
+	//this one try to transpose sq_m1 rather than transpose sq_m2
+	__global__
+	void
+	matrixMulV4(float *sq_m1, float *sq_m2, float *sq_m3, int sq_dim)
+	{
+		//memory coaleasing because each thread is accessing sq_m2 in different memory bank
+		//because threadIdx.x is typically different
+		int row = blockIdx.y * blockDim.y + threadIdx.y;
+		int col = blockIdx.x * blockDim.x + threadIdx.x;
+		
+		float sum = 0.0f;
+		if(row >= sq_dim || col >= sq_dim)
+			return ;
+		int i = 0;
+		for(i = 0;i < sq_dim;i++)
+		{
+			sum+=sq_m1[row * sq_dim + i] * sq_m2[col*sq_dim + i];
+		}
+		sq_m3[row * sq_dim + col] = sum;
+	}
+
 
 	//try to use block matrix multiplication and shared memory
 	__global__
 	void
-	matrixMulV5(float *sq_m1, float *sq_m2, float *sq_m3, int sq_dim, int submat_blk_size)
+	matrixMulV5(float *input_m1, float *input_m2, float *output_m3, int dim, int blk_size)
 	{
 		int blk_cnt = 0;
 		//m should be of size submat_blk_size * submat_blk_size * 2
-		extern __shared__ float m[];
-		float *m2 = m + submat_blk_size * submat_blk_size;
+		
+		__shared__ float *sq_m1;
+		__shared__ float *sq_m2;
+		__shared__ float *sq_m3;
+		__shared__ int sq_dim;
+		__shared__ int submat_blk_size;
+
+		sq_m1 = input_m1;
+		sq_m2 = input_m2;
+		sq_m3 = output_m3;
+		sq_dim = dim;
+		submat_blk_size = blk_size;
+		__shared__ float m[32][32];
+		__shared__ float m2[32][32];
+		//float *m2 = m + submat_blk_size * submat_blk_size;
 		int row = blockIdx.y * blockDim.y + threadIdx.y;
 		int col = blockIdx.x * blockDim.x + threadIdx.x;
 		
-		//if(row >= sq_dim || col >= sq_dim)
-		//	return ;
-		//if(row == 32 || col == 32)
-		//	printf("Wow\n");
 		float sum = 0.0f;
-		if(false)
-		{
-			//specially design for non-multiple of block size
-			if(blockIdx.x >= (gridDim.x-1) || blockIdx.y >= (gridDim.y-1))
-			{
-				int i = 0;
-				for(i = 0;i < sq_dim;i++)
-				{
-					sum+=sq_m1[row * sq_dim + i] * sq_m2[i*sq_dim + col];
-				}
-				sq_m3[row * sq_dim + col] = sum;
-				return;
-			}
-		}
+		
 		int max_blk_cnt;
 		int idx1, idx2, size = sq_dim * sq_dim;
+		int blk_offsetX, blk_offsetY;
 		if(sq_dim % submat_blk_size == 0)
 			max_blk_cnt = sq_dim / submat_blk_size;
 		else
@@ -177,6 +189,55 @@ namespace cuda
 			//bring zero for those un-unified position
 			idx1 = row * sq_dim + threadIdx.x + blk_cnt * submat_blk_size;
 			idx2 = (threadIdx.y + blk_cnt * submat_blk_size) * sq_dim + col;
+			if(idx1 < size && row < sq_dim) 
+				m[threadIdx.y][threadIdx.x] = sq_m1[idx1];
+			else
+				m[threadIdx.y][threadIdx.x] = 0.0f;
+			if(idx2 < size && col < sq_dim)
+				m2[threadIdx.y][threadIdx.x] = sq_m2[idx2];
+			else
+				m2[threadIdx.y][threadIdx.x] = 0.0f;
+			__syncthreads();
+		
+			//do computation based on that shared memory content
+			for(int k = 0; k < submat_blk_size;k++)
+					sum += m[threadIdx.y][k] * m2[k][threadIdx.x];
+			__syncthreads();
+		}
+		if(row < sq_dim && col < sq_dim)
+			sq_m3[row * sq_dim + col] = sum;
+		return ;
+	}
+	
+	//try to use block matrix multiplication, shared memory and transposed sq_m1
+	__global__
+	void
+	matrixMulV6(float *sq_m1, float *sq_m2, float *sq_m3, int sq_dim, int submat_blk_size)
+	{
+		int blk_cnt = 0;
+		//m should be of size submat_blk_size * submat_blk_size * 2
+		extern __shared__ float m[];
+		float *m2 = m + submat_blk_size * submat_blk_size;
+		int row = blockIdx.y * blockDim.y + threadIdx.y;
+		int col = blockIdx.x * blockDim.x + threadIdx.x;
+		
+		float sum = 0.0f;
+		int max_blk_cnt;
+		int idx1, idx2, size = sq_dim * sq_dim;
+		if(sq_dim % submat_blk_size == 0)
+			max_blk_cnt = sq_dim / submat_blk_size;
+		else
+			max_blk_cnt = sq_dim / submat_blk_size+1;
+		
+		for(blk_cnt = 0; blk_cnt < max_blk_cnt;blk_cnt++)
+		{
+			//block matrix multiplication with shared memory	
+			//each thread load one element into sub matrix in sq_m1 and one element into submatrix into sq_m2
+			//for matrix non-multiple of block_size,
+			//bring zero for those un-unified position
+			idx1 = (threadIdx.x + blk_cnt * submat_blk_size) * sq_dim + row;
+			idx2 = (threadIdx.y + blk_cnt * submat_blk_size) * sq_dim + col;
+			//idx2 = (threadIdx.y + blk_cnt * submat_blk_size) * sq_dim + col;
 			if(idx1 < size && row < sq_dim) 
 				m[threadIdx.y * submat_blk_size + threadIdx.x] = sq_m1[idx1];
 			else
@@ -200,7 +261,7 @@ namespace cuda
 			sq_m3[row * sq_dim + col] = sum;
 		return ;
 	}
-	
+
 	void 
 	matrix_multiplication(float *sq_matrix_1, float *sq_matrix_2, float *sq_matrix_result, unsigned int sq_dimension)
 	{
@@ -275,20 +336,11 @@ namespace cuda
 			dim3 dimBlock(MAX_BLK_DIM,MAX_BLK_DIM);
 			int gridSizeX = (sq_dimension / dimBlock.x) + 1, gridSizeY = (sq_dimension/dimBlock.y) + 1;
 			dim3 dimGrid(gridSizeX, gridSizeY);
-			//transpose the 1st matrix
-			int i = 0, j = 0;
-			float *sq_matrix_1t = (float*) malloc(size * sizeof(float));
-			float tmp = 0.0f;
-			for(i = 0; i < sq_dimension;i++)
-			{
-				for(j = 0;j < sq_dimension;j++)
-				{
-					sq_matrix_1t[j * sq_dimension + i] = sq_matrix_1[i * sq_dimension + j];
-				}
-			}
-			cudaMemcpy(sq_matrix_1_d, sq_matrix_1t, size, cudaMemcpyHostToDevice);
-			cudaMemcpy(sq_matrix_2_d, sq_matrix_2, size, cudaMemcpyHostToDevice);
-			free(sq_matrix_1t);
+			
+			float *m_t = transposeMatrix(sq_matrix_2,sq_dimension);
+			cudaMemcpy(sq_matrix_1_d, sq_matrix_1, size, cudaMemcpyHostToDevice);
+			cudaMemcpy(sq_matrix_2_d, m_t, size, cudaMemcpyHostToDevice);
+			free(m_t);
 			matrixMulV4<<<dimGrid, dimBlock>>>(sq_matrix_1_d, sq_matrix_2_d, sq_matrix_result_d, sq_dimension);
 #endif
 
@@ -312,6 +364,30 @@ namespace cuda
 		int submat_blk_size = blk_size;
 		matrixMulV5<<<dimGrid, dimBlock, sizeof(float) * submat_blk_size * submat_blk_size * 2>>>(sq_matrix_1_d, sq_matrix_2_d, sq_matrix_result_d, sq_dimension, submat_blk_size);
 #endif
+
+
+#if OPTIMIZE_OPT == 6
+		int blk_size = 32;
+		dim3 dimBlock(blk_size,blk_size);
+		int gridX, gridY;
+		if(sq_dimension % dimBlock.x == 0)
+			gridX = sq_dimension/dimBlock.x;
+		else 
+			gridX = sq_dimension/dimBlock.x + 1;
+		if(sq_dimension % dimBlock.y == 0)
+			gridY = sq_dimension/dimBlock.y;
+		else
+			gridY = sq_dimension/dimBlock.y + 1;
+
+		dim3 dimGrid(gridX, gridY);
+		float *m_t = transposeMatrix(sq_matrix_1,sq_dimension);
+		cudaMemcpy(sq_matrix_1_d,m_t,size,cudaMemcpyHostToDevice);
+		cudaMemcpy(sq_matrix_2_d,sq_matrix_2,size,cudaMemcpyHostToDevice);
+		int submat_blk_size = blk_size;
+		matrixMulV6<<<dimGrid, dimBlock, sizeof(float) * submat_blk_size * submat_blk_size * 2>>>(sq_matrix_1_d, sq_matrix_2_d, sq_matrix_result_d, sq_dimension, submat_blk_size);
+		free(m_t);
+#endif
+
 		}
 		/***************************************************
 	 3rd Part: Transfer result from device to host 
