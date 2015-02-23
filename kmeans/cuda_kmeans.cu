@@ -255,7 +255,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
 		//TODO numThreadsPerClusterBlock should be far 
 		//larger than the core count in order to maximize the 
 		//usage of per core in case of memory latency.
-    const unsigned int numThreadsPerClusterBlock = 128;
+    const unsigned int numThreadsPerClusterBlock = 1024;
     const unsigned int numClusterBlocks =
         (numObjs + numThreadsPerClusterBlock - 1) / numThreadsPerClusterBlock;
     const unsigned int clusterBlockSharedDataSize =
