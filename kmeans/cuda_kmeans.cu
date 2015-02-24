@@ -81,6 +81,9 @@ float euclid_dist_2(int    numCoords,
 }
 
 /*----< find_nearest_cluster() >---------------------------------------------*/
+/*
+* Basic idea: each thread is responsible for the membership of one object
+*/
 __global__ static
 void find_nearest_cluster(int numCoords,
                           int numObjs,
@@ -95,13 +98,18 @@ void find_nearest_cluster(int numCoords,
     //  The type chosen for membershipChanged must be large enough to support
     //  reductions! There are blockDim.x elements, one for each thread in the
     //  block.
-    unsigned char *membershipChanged = (unsigned char *)sharedMemory;
-    float *clusters = (float *)(sharedMemory + blockDim.x);
+    // membershipChanged is used to record number of
+    // objects that have changed their membership
+    // We perform a reduction on this
+    unsigned int *membershipChanged = (unsigned int *)sharedMemory;
+    float *clusters = (float *)(sharedMemory + blockDim.x*sizeof(unsigned int));
 
     membershipChanged[threadIdx.x] = 0;
 
     //  BEWARE: We can overrun our shared memory here if there are too many
     //  clusters or too many coordinates!
+    // No need to worry about this part since numThreadsPerClusterBlock is fixed,
+    // also, numClusters * numCoords is very small for all test dataset
     for (int i = threadIdx.x; i < numClusters; i += blockDim.x) {
         for (int j = 0; j < numCoords; j++) {
             clusters[numClusters * j + i] = deviceClusters[numClusters * j + i];
@@ -140,6 +148,7 @@ void find_nearest_cluster(int numCoords,
         __syncthreads();    //  For membershipChanged[]
 
         //  blockDim.x *must* be a power of two!
+        // blockDim.x = numThreadsPerClusterBlock
         for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1) {
             if (threadIdx.x < s) {
                 membershipChanged[threadIdx.x] +=
@@ -156,7 +165,7 @@ void find_nearest_cluster(int numCoords,
 
 __global__ static
 void compute_delta(int *deviceIntermediates,
-                   int numIntermediates,    //  The actual number of intermediates
+                   int numIntermediates,    //  The actual number of intermediates, which is numBlock for findNearestCenter
                    int numIntermediates2)   //  The next power of two
 {
     //  The number of elements in this array should be equal to
@@ -171,6 +180,7 @@ void compute_delta(int *deviceIntermediates,
     __syncthreads();
 
     //  numIntermediates2 *must* be a power of two!
+    // s surely < numIntermediates.
     for (unsigned int s = numIntermediates2 / 2; s > 0; s >>= 1) {
         if (threadIdx.x < s) {
             intermediates[threadIdx.x] += intermediates[threadIdx.x + s];
@@ -218,10 +228,11 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
     float *deviceObjects;
     float *deviceClusters;
     int *deviceMembership;
-    int *deviceIntermediates;
+    int *deviceIntermediates; // Record cluster changes for each block.
 
     //  Copy objects given in [numObjs][numCoords] layout to new
     //  [numCoords][numObjs] layout
+    // Note: why transform the layout?
     malloc2D(dimObjects, numCoords, numObjs, float);
     for (i = 0; i < numCoords; i++) {
         for (j = 0; j < numObjs; j++) {
@@ -247,17 +258,23 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
     malloc2D(newClusters, numCoords, numClusters, float);
     memset(newClusters[0], 0, numCoords * numClusters * sizeof(float));
 
+
     //  To support reduction, numThreadsPerClusterBlock *must* be a power of
     //  two, and it *must* be no larger than the number of bits that will
     //  fit into an unsigned char, the type used to keep track of membership
     //  changes in the kernel.
-    const unsigned int numThreadsPerClusterBlock = 128;
+    const unsigned int numThreadsPerClusterBlock = 1024;
     const unsigned int numClusterBlocks =
-        (numObjs + numThreadsPerClusterBlock - 1) / numThreadsPerClusterBlock;
+        (numObjs + numThreadsPerClusterBlock - 1) / numThreadsPerClusterBlock; // ceil(numObjs / numThreadsPerBlock)
+    // Shared Data : membershipChanged and clusters
+    // size of membershipChanged in shared memory is numThreadsPerClusterBlock * sizeof(uint)
+    // while size of clusters in shared mem is numClusters * numCoords * sizeof(float)
     const unsigned int clusterBlockSharedDataSize =
-        numThreadsPerClusterBlock * sizeof(unsigned char) +
+        numThreadsPerClusterBlock * sizeof(unsigned int) +
         numClusters * numCoords * sizeof(float);
 
+    // The size of deviceIntermediates should be at least numClusterBlocks
+    // since we are assigning intermediates for each block.
     const unsigned int numReductionThreads =
         nextPowerOfTwo(numClusterBlocks);
     const unsigned int reductionBlockSharedDataSize =
@@ -266,7 +283,11 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
     checkCuda(cudaMalloc(&deviceObjects, numObjs*numCoords*sizeof(float)));
     checkCuda(cudaMalloc(&deviceClusters, numClusters*numCoords*sizeof(float)));
     checkCuda(cudaMalloc(&deviceMembership, numObjs*sizeof(int)));
-    checkCuda(cudaMalloc(&deviceIntermediates, numReductionThreads*sizeof(unsigned int)));
+    checkCuda(cudaMalloc(&deviceIntermediates, numReductionThreads*sizeof(int)));
+
+    //printf("%u %u %u\n", numClusterBlocks, numThreadsPerClusterBlock, clusterBlockSharedDataSize);
+    //printf("%u %u\n",numReductionThreads, reductionBlockSharedDataSize);
+
 
     checkCuda(cudaMemcpy(deviceObjects, dimObjects[0],
               numObjs*numCoords*sizeof(float), cudaMemcpyHostToDevice));
@@ -281,7 +302,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
             <<< numClusterBlocks, numThreadsPerClusterBlock, clusterBlockSharedDataSize >>>
             (numCoords, numObjs, numClusters,
              deviceObjects, deviceClusters, deviceMembership, deviceIntermediates);
-
+            
         cudaThreadSynchronize(); checkLastCudaError();
 
         compute_delta <<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
