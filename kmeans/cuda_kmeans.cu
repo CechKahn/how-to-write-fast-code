@@ -354,23 +354,6 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
         cudaThreadSynchronize(); checkLastCudaError();
         delta = (float)getFirstDeviceValue(deviceIntermediates);
 
-        /* compute cluter size */
-        for (int i = 0; i < numClusters; i++) {
-          /* first step reduction. reduce cluster size */
-          reduce_cluster_size_per_block<<<
-            numClusterBlocks,
-            numThreadsPerClusterBlock,
-            numThreadsPerClusterBlock * sizeof(BlockAccInt)
-            >>>(deviceMembership, numObjs, i, deviceIntermediates);
-          cudaThreadSynchronize(); checkLastCudaError();
-          /* second step reduction */
-          compute_delta <<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
-            (deviceIntermediates, numClusterBlocks, numReductionThreads);
-          newClusterSize[i] = getFirstDeviceValue(deviceIntermediates);
-          cudaThreadSynchronize(); checkLastCudaError();
-        }
-
-
         checkCuda(cudaMemcpy(membership, deviceMembership,
                     numObjs*sizeof(int), cudaMemcpyDeviceToHost));
 
@@ -379,7 +362,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
             index = membership[i];
 
             /* update new cluster centers : sum of objects located within */
-            // newClusterSize[index]++;
+            newClusterSize[index]++;
             for (int j=0; j<numCoords; j++)
                 newClusters[j][index] += objects[i][j];
         }
