@@ -166,16 +166,47 @@ void find_nearest_cluster(int numCoords,
     }
 }
 
-template <class T>
 __global__ static
-void compute_delta(T *deviceIntermediates,
+void reduce_device_intermediates_int(int *deviceIntermediates,
                    int numIntermediates,    //  The actual number of intermediates, which is numBlock for findNearestCenter
                    int numIntermediates2)   //  The next power of two
 {
     //  The number of elements in this array should be equal to
     //  numIntermediates2, the number of threads launched. It *must* be a power
     //  of two!
-    extern __shared__ T intermediates[];
+    extern __shared__ int intermediates[];
+
+    //  Copy global intermediate values into shared memory.
+    intermediates[threadIdx.x] =
+        (threadIdx.x < numIntermediates) ? deviceIntermediates[threadIdx.x] : 0;
+
+    __syncthreads();
+
+    //  numIntermediates2 *must* be a power of two!
+    // s surely < numIntermediates.
+    for (unsigned int s = numIntermediates2 / 2; s > 0; s >>= 1) {
+        if (threadIdx.x < s) {
+            intermediates[threadIdx.x] += intermediates[threadIdx.x + s];
+        }
+        __syncthreads();
+    }
+
+    if (threadIdx.x == 0) {
+        deviceIntermediates[0] = intermediates[0];
+    }
+}
+
+/* sadly, nvcc compiler has poor support for Template */
+__global__ static
+void reduce_device_intermediates_float(
+                   float *deviceIntermediates,
+                   int numIntermediates,    //  The actual number of intermediates, which is numBlock for findNearestCenter
+                   int numIntermediates2)   //  The next power of two
+{
+    //  The number of elements in this array should be equal to
+    //  numIntermediates2, the number of threads launched. It *must* be a power
+    //  of two!
+    extern __shared__ float intermediates[];
 
     //  Copy global intermediate values into shared memory.
     intermediates[threadIdx.x] =
@@ -380,7 +411,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
             
         cudaThreadSynchronize(); checkLastCudaError();
 
-        compute_delta<int><<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
+        reduce_device_intermediates_int<<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
             (deviceIntermediates, numClusterBlocks, numReductionThreads);
 
         cudaThreadSynchronize(); checkLastCudaError();
@@ -396,7 +427,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
             >>>(deviceMembership, numObjs, i, deviceIntermediates);
           cudaThreadSynchronize(); checkLastCudaError();
           /* second step reduction */
-          compute_delta<int><<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
+          reduce_device_intermediates_int<<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
             (deviceIntermediates, numClusterBlocks, numReductionThreads);
           cudaThreadSynchronize(); checkLastCudaError();
           newClusterSize[i] = getFirstDeviceValue(deviceIntermediates);
@@ -414,7 +445,8 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
                   deviceObjects,
                   numObjs, j, i, deviceCoordIntermediates);
             cudaThreadSynchronize(); checkLastCudaError();
-            compute_delta<float><<<1, numReductionThreads, reductionBlockSharedDataSize>>>(deviceCoordIntermediates, numClusterBlocks, numReductionThreads);
+            reduce_device_intermediates_float<<<1, numReductionThreads, reductionBlockSharedDataSize>>>(deviceCoordIntermediates, numClusterBlocks, numReductionThreads);
+            cudaThreadSynchronize(); checkLastCudaError();
             newClusters[i][j] = getFirstDeviceValue(deviceCoordIntermediates);
           }
         }
