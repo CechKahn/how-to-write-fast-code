@@ -265,31 +265,6 @@ __global__ void reduce_cluster_center_per_block(
   }
 }
 
-/* inline void updateClusterCenters( */
-/*     const int numCoords, */
-/*     const int numObjs, */
-/*     const int numClusters */
-/*     ) { */
-/*   const unsigned int shared_cache_size = 44 * 1024; */
-/*   const unsigned int numThreadsPerClusterBlock = std::max( */
-/*       shared_cache_size / (numCoords * sizeof(float)), 1024); */
-/*   const unsigned int numClusterBlocks = */
-/*     (numObjs + numThreadsPerClusterBlock - 1) / numThreadsPerClusterBlock; */
-/*   const unsigned int clusterBlockSharedDataSize = numCoords * sizeof(float) * numThreadsPerClusterBlock; */
-
-/*   const unsigned int numReductionThreads = */
-/*     nextPowerOfTwo(numClusterBlocks); */
-/*   const unsigned int reductionBlockSharedDataSize = numReductionThreads * sizeof(unsigned int); */
-
-/*   for (int i = 0; i < numClusters; i++) { */
-/*     reduce_cluster_center_per_block<<< */
-/*       numClusterBlocks, */
-/*       numThreadsPerClusterBlock, */
-/*       clusterBlockSharedDataSize>>>(); */
-/*     cudaThreadSynchronize(); checkLastCudaError(); */
-/*     reduce_cluster_center_per_block<<<1, numReductionThreads, reductionBlockSharedDataSize>>>(); */
-/*   } */
-/* } */
 
 /*----< cuda_kmeans() >-------------------------------------------------------*/
 //
@@ -435,7 +410,9 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
               numClusterBlocks,
               numThreadsPerClusterBlock,
               numThreadsPerClusterBlock * sizeof(float)>>>(
-                  deviceMembership, numObjs, j, i, deviceCoordIntermediates);
+                  deviceMembership,
+                  deviceObjects,
+                  numObjs, j, i, deviceCoordIntermediates);
             cudaThreadSynchronize(); checkLastCudaError();
             compute_delta<<<1, numReductionThreads, reductionBlockSharedDataSize>>>(deviceCoordIntermediates, numClusterBlocks, numReductionThreads);
             newClusters[i][j] = getFirstDeviceValue(deviceCoordIntermediates);
