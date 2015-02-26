@@ -361,7 +361,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
             numClusterBlocks,
             numThreadsPerClusterBlock,
             numThreadsPerClusterBlock * sizeof(BlockAccInt)
-            >>>(deviceMembership, i, numObjs, deviceIntermediates);
+            >>>(deviceMembership, numObjs, i, deviceIntermediates);
           cudaThreadSynchronize(); checkLastCudaError();
           /* second step reduction */
           compute_delta <<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
@@ -382,10 +382,6 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
             // newClusterSize[index]++;
             for (int j=0; j<numCoords; j++)
                 newClusters[j][index] += objects[i][j];
-        }
-
-        for (int i = 0; i < numClusters; i++) {
-            printf("%d\n", newClusterSize[i]);
         }
 
         //  TODO: Flip the nesting order
