@@ -206,10 +206,11 @@ void reduce_device_intermediates_float(
     //  The number of elements in this array should be equal to
     //  numIntermediates2, the number of threads launched. It *must* be a power
     //  of two!
-    extern __shared__ float intermediates[];
+    // Cuda's language design is horrible
+    extern __shared__ float intermediates_float[];
 
     //  Copy global intermediate values into shared memory.
-    intermediates[threadIdx.x] =
+    intermediates_float[threadIdx.x] =
         (threadIdx.x < numIntermediates) ? deviceIntermediates[threadIdx.x] : 0;
 
     __syncthreads();
@@ -218,13 +219,13 @@ void reduce_device_intermediates_float(
     // s surely < numIntermediates.
     for (unsigned int s = numIntermediates2 / 2; s > 0; s >>= 1) {
         if (threadIdx.x < s) {
-            intermediates[threadIdx.x] += intermediates[threadIdx.x + s];
+            intermediates_float[threadIdx.x] += intermediates_float[threadIdx.x + s];
         }
         __syncthreads();
     }
 
     if (threadIdx.x == 0) {
-        deviceIntermediates[0] = intermediates[0];
+        deviceIntermediates[0] = intermediates_float[0];
     }
 }
 
@@ -435,24 +436,23 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
         /* compute cluster coordinates */
 
         for (int i = 0; i < numCoords; i++) {
-          for (int j = 0; j < numClusters; j++) {
-            /* first step reduction reduce cluster center coord j */
-            reduce_cluster_center_per_block<<<
-              numClusterBlocks,
-              numThreadsPerClusterBlock,
-              numThreadsPerClusterBlock * sizeof(float)>>>(
-                  deviceMembership,
-                  deviceObjects,
-                  numObjs, j, i, deviceCoordIntermediates);
-            cudaThreadSynchronize(); checkLastCudaError();
-            reduce_device_intermediates_float<<<1, numReductionThreads, reductionBlockSharedDataSize>>>(deviceCoordIntermediates, numClusterBlocks, numReductionThreads);
-            cudaThreadSynchronize(); checkLastCudaError();
-            newClusters[i][j] = getFirstDeviceValue(deviceCoordIntermediates);
+            for (int j = 0; j < numClusters; j++) {
+                reduce_cluster_center_per_block<<<
+                    numClusterBlocks,
+                    numThreadsPerClusterBlock,
+                    numThreadsPerClusterBlock * sizeof(float)>>>(
+                            deviceMembership,
+                            deviceObjects,
+                            numObjs, j, i, deviceCoordIntermediates);
+                cudaThreadSynchronize(); checkLastCudaError();
+                reduce_device_intermediates_float<<<1, numReductionThreads, reductionBlockSharedDataSize>>>(deviceCoordIntermediates, numClusterBlocks, numReductionThreads);
+                cudaThreadSynchronize(); checkLastCudaError();
+                newClusters[i][j] = getFirstDeviceValue(deviceCoordIntermediates);
           }
         }
 
-        checkCuda(cudaMemcpy(membership, deviceMembership,
-                    numObjs*sizeof(int), cudaMemcpyDeviceToHost));
+        //checkCuda(cudaMemcpy(membership, deviceMembership,
+                    //numObjs*sizeof(int), cudaMemcpyDeviceToHost));
 
         // for (int i=0; i<numObjs; i++) {
             /* find the array index of nestest cluster center */
