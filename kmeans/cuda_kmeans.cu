@@ -289,7 +289,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
                    int    *membership,   /* out: [numObjs] */
                    int    *loop_iterations)
 {
-    int      i, j, index, loop=0;
+    int      i, j, loop=0;
     int     *newClusterSize; /* [numClusters]: no. objects assigned in each
                                 new cluster */
     float    delta;          /* % of objects change their clusters */
@@ -380,7 +380,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
             
         cudaThreadSynchronize(); checkLastCudaError();
 
-        compute_delta <<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
+        compute_delta<int><<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
             (deviceIntermediates, numClusterBlocks, numReductionThreads);
 
         cudaThreadSynchronize(); checkLastCudaError();
@@ -396,7 +396,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
             >>>(deviceMembership, numObjs, i, deviceIntermediates);
           cudaThreadSynchronize(); checkLastCudaError();
           /* second step reduction */
-          compute_delta <<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
+          compute_delta<int><<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
             (deviceIntermediates, numClusterBlocks, numReductionThreads);
           cudaThreadSynchronize(); checkLastCudaError();
           newClusterSize[i] = getFirstDeviceValue(deviceIntermediates);
@@ -414,7 +414,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
                   deviceObjects,
                   numObjs, j, i, deviceCoordIntermediates);
             cudaThreadSynchronize(); checkLastCudaError();
-            compute_delta<<<1, numReductionThreads, reductionBlockSharedDataSize>>>(deviceCoordIntermediates, numClusterBlocks, numReductionThreads);
+            compute_delta<float><<<1, numReductionThreads, reductionBlockSharedDataSize>>>(deviceCoordIntermediates, numClusterBlocks, numReductionThreads);
             newClusters[i][j] = getFirstDeviceValue(deviceCoordIntermediates);
           }
         }
