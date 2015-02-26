@@ -298,6 +298,10 @@ __global__ void reduce_cluster_center_per_block(
 }
 
 
+__global__ void update_cluster_center() {
+}
+
+
 /*----< cuda_kmeans() >-------------------------------------------------------*/
 //
 //  ----------------------------------------
@@ -435,6 +439,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
         }
         /* compute cluster coordinates */
 
+
         for (int i = 0; i < numCoords; i++) {
             for (int j = 0; j < numClusters; j++) {
                 reduce_cluster_center_per_block<<<
@@ -444,9 +449,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
                             deviceMembership,
                             deviceObjects,
                             numObjs, j, i, deviceCoordIntermediates);
-                //cudaThreadSynchronize(); checkLastCudaError();
                 reduce_device_intermediates_float<<<1, numReductionThreads, reductionBlockSharedDataSize>>>(deviceCoordIntermediates, numClusterBlocks, numReductionThreads);
-                //cudaThreadSynchronize(); checkLastCudaError();
                 newClusters[i][j] = getFirstDeviceValue(deviceCoordIntermediates);
           }
         }
