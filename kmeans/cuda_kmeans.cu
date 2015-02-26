@@ -410,12 +410,12 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
             (numCoords, numObjs, numClusters,
              deviceObjects, deviceClusters, deviceMembership, deviceIntermediates);
             
-        cudaThreadSynchronize(); checkLastCudaError();
+        // cudaThreadSynchronize(); checkLastCudaError();
 
         reduce_device_intermediates_int<<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
             (deviceIntermediates, numClusterBlocks, numReductionThreads);
 
-        cudaThreadSynchronize(); checkLastCudaError();
+        // cudaThreadSynchronize(); checkLastCudaError();
         delta = (float)getFirstDeviceValue(deviceIntermediates);
 
         /* compute cluter size */
@@ -426,11 +426,11 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
             numThreadsPerClusterBlock,
             numThreadsPerClusterBlock * sizeof(BlockAccInt)
             >>>(deviceMembership, numObjs, i, deviceIntermediates);
-          cudaThreadSynchronize(); checkLastCudaError();
+          //cudaThreadSynchronize(); checkLastCudaError();
           /* second step reduction */
           reduce_device_intermediates_int<<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
             (deviceIntermediates, numClusterBlocks, numReductionThreads);
-          cudaThreadSynchronize(); checkLastCudaError();
+          //cudaThreadSynchronize(); checkLastCudaError();
           newClusterSize[i] = getFirstDeviceValue(deviceIntermediates);
         }
         /* compute cluster coordinates */
@@ -444,9 +444,9 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
                             deviceMembership,
                             deviceObjects,
                             numObjs, j, i, deviceCoordIntermediates);
-                cudaThreadSynchronize(); checkLastCudaError();
+                //cudaThreadSynchronize(); checkLastCudaError();
                 reduce_device_intermediates_float<<<1, numReductionThreads, reductionBlockSharedDataSize>>>(deviceCoordIntermediates, numClusterBlocks, numReductionThreads);
-                cudaThreadSynchronize(); checkLastCudaError();
+                //cudaThreadSynchronize(); checkLastCudaError();
                 newClusters[i][j] = getFirstDeviceValue(deviceCoordIntermediates);
           }
         }
@@ -479,6 +479,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
         delta /= numObjs;
     } while (delta > threshold && loop++ < 500);
 
+    cudaThreadSynchronize(); checkLastCudaError();
     *loop_iterations = loop + 1;
 
     /* allocate a 2D space for returning variable clusters[] (coordinates
