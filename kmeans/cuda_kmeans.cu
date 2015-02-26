@@ -328,6 +328,10 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
                 newClusters[j][index] += objects[i][j];
         }
 
+        for (int i = 0; i < numClusters; i++) {
+            printf("%d\n", newClusterSize[i]);
+        }
+
         //  TODO: Flip the nesting order
         //  TODO: Change layout of newClusters to [numClusters][numCoords]
         /* average the sum and replace old cluster centers with newClusters */
