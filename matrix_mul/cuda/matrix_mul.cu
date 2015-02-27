@@ -30,7 +30,7 @@
 #define SUBMAT_BLK_SIZE 32
 
 #define SHARED_MEM_SIZE 49152
-#define OPTIMIZE_OPT 1
+#define OPTIMIZE_OPT 5
 namespace cuda
 {
 	//this function generate a transposed matrix 
