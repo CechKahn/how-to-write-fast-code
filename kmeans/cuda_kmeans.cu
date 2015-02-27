@@ -167,14 +167,14 @@ void find_nearest_cluster(int numCoords,
 }
 
 __global__ static
-void reduce_device_intermediates_int(int *deviceIntermediates,
+void compute_delta(int *deviceIntermediates,
                    int numIntermediates,    //  The actual number of intermediates, which is numBlock for findNearestCenter
                    int numIntermediates2)   //  The next power of two
 {
     //  The number of elements in this array should be equal to
     //  numIntermediates2, the number of threads launched. It *must* be a power
     //  of two!
-    extern __shared__ int intermediates[];
+    extern __shared__ unsigned int intermediates[];
 
     //  Copy global intermediate values into shared memory.
     intermediates[threadIdx.x] =
@@ -196,44 +196,11 @@ void reduce_device_intermediates_int(int *deviceIntermediates,
     }
 }
 
-/* sadly, nvcc compiler has poor support for Template */
-__global__ static
-void reduce_device_intermediates_float(
-                   float *deviceIntermediates,
-                   int numIntermediates,    //  The actual number of intermediates, which is numBlock for findNearestCenter
-                   int numIntermediates2)   //  The next power of two
-{
-    //  The number of elements in this array should be equal to
-    //  numIntermediates2, the number of threads launched. It *must* be a power
-    //  of two!
-    // Cuda's language design is horrible
-    extern __shared__ float intermediates_float[];
-
-    //  Copy global intermediate values into shared memory.
-    intermediates_float[threadIdx.x] =
-        (threadIdx.x < numIntermediates) ? deviceIntermediates[threadIdx.x] : 0;
-
-    __syncthreads();
-
-    //  numIntermediates2 *must* be a power of two!
-    // s surely < numIntermediates.
-    for (unsigned int s = numIntermediates2 / 2; s > 0; s >>= 1) {
-        if (threadIdx.x < s) {
-            intermediates_float[threadIdx.x] += intermediates_float[threadIdx.x + s];
-        }
-        __syncthreads();
-    }
-
-    if (threadIdx.x == 0) {
-        deviceIntermediates[0] = intermediates_float[0];
-    }
-}
-
 
 __global__ void reduce_cluster_size_per_block(
     const int *deviceMembership,
-    const int numObjs,
-    const int clusterId,
+    int numObjs,
+    int cluster_id,
     int *clusterSizeIntermediates) {
   extern __shared__ char sharedMemory[];
   /* blockDim.x * sizeof(BlockAccInt) */
@@ -241,7 +208,7 @@ __global__ void reduce_cluster_size_per_block(
 
   clusterSize[threadIdx.x] = 0;
   int objectId = blockDim.x * blockIdx.x + threadIdx.x;
-  if (objectId < numObjs && deviceMembership[objectId] == clusterId) {
+  if (objectId < numObjs && deviceMembership[objectId] == cluster_id) {
     clusterSize[threadIdx.x] = 1;
   }
   __syncthreads();
@@ -258,7 +225,8 @@ __global__ void reduce_cluster_size_per_block(
 }
 
 
-
+__global__ void reduce_cluster_size() {
+}
 
 
 template <class T>
@@ -267,36 +235,6 @@ inline T getFirstDeviceValue(T *device_arr) {
   checkCuda(cudaMemcpy(&ans, device_arr, sizeof(T), cudaMemcpyDeviceToHost));
   return ans;
 }
-
-
-__global__ void reduce_cluster_center_per_block(
-  const int *deviceMembership,
-  const float *deviceObjects,
-  const int numObjs,
-  const int clusterId,
-  const int coordId,
-  float *clusterCoordIntermediates) {
-  extern __shared__ char sharedMemory[];
-  float *clusterCoords = (float *)sharedMemory;
-
-  clusterCoords[threadIdx.x] = 0.0f;
-  int objectId = blockDim.x * blockIdx.x + threadIdx.x;
-  if (objectId < numObjs && deviceMembership[objectId] == clusterId) {
-    // copy coordinate
-    clusterCoords[threadIdx.x] = deviceObjects[numObjs * coordId + objectId];
-  }
-  __syncthreads();
-  for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1) {
-    if (threadIdx.x < s) {
-      clusterCoords[threadIdx.x] += clusterCoords[threadIdx.x + s];
-    }
-    __syncthreads();
-  }
-  if (threadIdx.x == 0) {
-    clusterCoordIntermediates[blockIdx.x] = clusterCoords[0];
-  }
-}
-
 
 /*----< cuda_kmeans() >-------------------------------------------------------*/
 //
@@ -321,7 +259,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
                    int    *membership,   /* out: [numObjs] */
                    int    *loop_iterations)
 {
-    int      i, j, loop=0;
+    int      i, j, index, loop=0;
     int     *newClusterSize; /* [numClusters]: no. objects assigned in each
                                 new cluster */
     float    delta;          /* % of objects change their clusters */
@@ -334,7 +272,6 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
     float *deviceClusters;
     int *deviceMembership;
     int *deviceIntermediates; // Record cluster changes for each block.
-    float *deviceCoordIntermediates;
 
     //  Copy objects given in [numObjs][numCoords] layout to new
     //  [numCoords][numObjs] layout
@@ -390,7 +327,6 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
     checkCuda(cudaMalloc(&deviceClusters, numClusters*numCoords*sizeof(float)));
     checkCuda(cudaMalloc(&deviceMembership, numObjs*sizeof(int)));
     checkCuda(cudaMalloc(&deviceIntermediates, numReductionThreads*sizeof(int)));
-    checkCuda(cudaMalloc(&deviceCoordIntermediates, numReductionThreads*sizeof(float)));
 
     //printf("%u %u %u\n", numClusterBlocks, numThreadsPerClusterBlock, clusterBlockSharedDataSize);
     //printf("%u %u\n",numReductionThreads, reductionBlockSharedDataSize);
@@ -410,65 +346,24 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
             (numCoords, numObjs, numClusters,
              deviceObjects, deviceClusters, deviceMembership, deviceIntermediates);
             
-        cudaThreadSynchronize(); checkLastCudaError();
 
-        reduce_device_intermediates_int<<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
+        compute_delta <<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
             (deviceIntermediates, numClusterBlocks, numReductionThreads);
 
-        cudaThreadSynchronize(); checkLastCudaError();
         delta = (float)getFirstDeviceValue(deviceIntermediates);
 
-        /* compute cluter size */
-        for (int i = 0; i < numClusters; i++) {
-          /* first step reduction. reduce cluster size */
-          reduce_cluster_size_per_block<<<
-            numClusterBlocks,
-            numThreadsPerClusterBlock,
-            numThreadsPerClusterBlock * sizeof(BlockAccInt)
-            >>>(deviceMembership, numObjs, i, deviceIntermediates);
-          cudaThreadSynchronize(); checkLastCudaError();
-          /* second step reduction */
-          reduce_device_intermediates_int<<< 1, numReductionThreads, reductionBlockSharedDataSize >>>
-            (deviceIntermediates, numClusterBlocks, numReductionThreads);
-          cudaThreadSynchronize(); checkLastCudaError();
-          newClusterSize[i] = getFirstDeviceValue(deviceIntermediates);
-        }
-        /* compute cluster coordinates */
+        checkCuda(cudaMemcpy(membership, deviceMembership,
+                    numObjs*sizeof(int), cudaMemcpyDeviceToHost));
 
-        for (int i = 0; i < numCoords; i++) {
-            for (int j = 0; j < numClusters; j++) {
-                reduce_cluster_center_per_block<<<
-                    numClusterBlocks,
-                    numThreadsPerClusterBlock,
-                    numThreadsPerClusterBlock * sizeof(float)>>>(
-                            deviceMembership,
-                            deviceObjects,
-                            numObjs, j, i, deviceCoordIntermediates);
-                cudaThreadSynchronize(); checkLastCudaError();
-                reduce_device_intermediates_float<<<
-                    1,
-                    numReductionThreads,
-                    reductionBlockSharedDataSize>>>(
-                        deviceCoordIntermediates,
-                        numClusterBlocks,
-                        numReductionThreads);
-                cudaThreadSynchronize(); checkLastCudaError();
-                newClusters[i][j] = getFirstDeviceValue(deviceCoordIntermediates);
-          }
-        }
-
-        //checkCuda(cudaMemcpy(membership, deviceMembership,
-                    //numObjs*sizeof(int), cudaMemcpyDeviceToHost));
-
-        // for (int i=0; i<numObjs; i++) {
+        for (int i=0; i<numObjs; i++) {
             /* find the array index of nestest cluster center */
-            //index = membership[i];
+            index = membership[i];
 
             /* update new cluster centers : sum of objects located within */
-            // newClusterSize[index]++;
-            // for (int j=0; j<numCoords; j++)
-              // newClusters[j][index] += objects[i][j];
-        //}
+            newClusterSize[index]++;
+            for (int j=0; j<numCoords; j++)
+                newClusters[j][index] += objects[i][j];
+        }
 
         //  TODO: Flip the nesting order
         //  TODO: Change layout of newClusters to [numClusters][numCoords]
@@ -485,6 +380,7 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
         delta /= numObjs;
     } while (delta > threshold && loop++ < 500);
 
+    cudaThreadSynchronize(); checkLastCudaError();
     *loop_iterations = loop + 1;
 
     /* allocate a 2D space for returning variable clusters[] (coordinates
@@ -500,7 +396,6 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
     checkCuda(cudaFree(deviceClusters));
     checkCuda(cudaFree(deviceMembership));
     checkCuda(cudaFree(deviceIntermediates));
-    checkCuda(cudaFree(deviceCoordIntermediates));
 
     free(dimObjects[0]);
     free(dimObjects);
