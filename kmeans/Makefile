@@ -40,19 +40,18 @@
 all: seq omp cuda
 
 DFLAGS      =
-OPTFLAGS    = -O3 #-DNDEBUG
-OPTFLAGS    = -g -pg
+OPTFLAGS    = -O3
 INCFLAGS    = -I.
 CFLAGS      = $(OPTFLAGS) $(DFLAGS) $(INCFLAGS)
 NVCCFLAGS   = $(CFLAGS) --ptxas-options=-v -arch=sm_20
 LDFLAGS     = $(OPTFLAGS)
 LIBS        =
-SSEFLAGS    = -msse3 -msse4
+
 # please check the compile to the one you use and the openmp flag
 # Here, I am using gcc and its openmp compile flag is -fopenmp
 # If icc is used, please us -opnemp
 #
-OMPFLAGS    = -fopenmp
+OMPFLAGS    = -O3 -fopenmp -lm -msse2 -msse3
 
 CC          = gcc
 MPICC       = mpicc
@@ -70,11 +69,11 @@ OMP_SRC     = omp_main.c \
 OMP_OBJ     = $(OMP_SRC:%.c=%.o)
 
 omp_kmeans.o: omp_kmeans.c $(H_FILES)
-	$(CC) $(CFLAGS) $(OMPFLAGS) $(SSEFLAGS) -c omp_kmeans.c -O3
+	$(CC) $(CFLAGS) $(OMPFLAGS) -c omp_kmeans.c
 
 omp: omp_main
 omp_main: $(OMP_OBJ) file_io.o
-	$(CC) $(LDFLAGS) $(OMPFLAGS) $(SSEFLAGS) -o omp_main $(OMP_OBJ) file_io.o $(LIBS) -O3
+	$(CC) $(LDFLAGS) $(OMPFLAGS) -o omp_main $(OMP_OBJ) file_io.o $(LIBS)
 
 #------   sequential version -----------------------------------------
 SEQ_SRC     = seq_main.c   \
@@ -88,7 +87,7 @@ $(SEQ_OBJ): $(H_FILES)
 
 seq: seq_main
 seq_main: $(SEQ_OBJ) $(H_FILES)
-	$(CC) $(LDFLAGS) -o seq_main $(SEQ_OBJ) $(LIBS) -O3
+	$(CC) $(LDFLAGS) -o seq_main $(SEQ_OBJ) $(LIBS)
 
 # ------------------------------------------------------------------------------
 # CUDA Version
